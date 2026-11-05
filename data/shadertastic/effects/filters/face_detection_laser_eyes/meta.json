@@ -1,0 +1,102 @@
+{
+  "about": {
+    "author_name": "xurei",
+    "author_url": "http://about.xurei.io"
+  },
+  "revision": 2,
+  "metafileVersion": 1,
+  "label": "[Face Tracking] Laser Eyes",
+  "steps": 4,
+  "parameters": [
+    {
+      "type": "facetracking",
+      "name": "fd",
+      "use_preraster": true,
+      "reset_on_face_lost": {
+        "prompt": true,
+        "default": true
+      }
+    },
+    {
+      "name": "audio_level",
+      "label": "Audio Source",
+      "type": "audiolevel"
+    },
+    {
+      "name": "audio_threshold_low",
+      "label": "Audio Threshold (low)",
+      "type": "float",
+      "slider": true,
+      "min": -100.0,
+      "max": -0.1,
+      "default": -50,
+      "step": 0.1
+    },
+    {
+      "name": "audio_threshold_high",
+      "label": "Audio Threshold (high)",
+      "type": "float",
+      "slider": true,
+      "min": -100.0,
+      "max": 0.0,
+      "default": -10.0,
+      "step": 0.1
+    },
+    {
+      "name": "audio_impact",
+      "label": "Audio level impact",
+      "type": "double",
+      "slider": true,
+      "min": 0,
+      "max": 1.0,
+      "default": 0.6,
+      "step": 0.01
+    },
+    {
+      "name": "no_effect_if_no_sound",
+      "label": "Disable effect if sound does not trigger",
+      "type": "bool",
+      "default": false
+    },
+    {
+      "name": "intensity",
+      "label": "Halo Intensity",
+      "type": "double",
+      "slider": true,
+      "min": 0,
+      "max": 20.0,
+      "default": 10.0,
+      "step": 0.01
+    },
+    {
+      "name": "flare_width",
+      "label": "Flare Width",
+      "type": "double",
+      "slider": true,
+      "min": 0,
+      "max": 2.0,
+      "default": 0.3,
+      "step": 0.01
+    },
+    {
+      "name": "eye_intensity_ratio",
+      "label": "Eyes Intensity",
+      "type": "double",
+      "slider": true,
+      "min": 0,
+      "max": 1.0,
+      "default": 0.6,
+      "step": 0.01
+    },
+    {
+      "name": "hue_shift",
+      "label": "Laser Hue Shift",
+      "type": "double",
+      "slider": true,
+      "min": -360.0,
+      "max": 360.0,
+      "default": 0.0,
+      "step": 0.1
+    }
+  ]
+}

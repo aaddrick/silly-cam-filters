@@ -1,0 +1,166 @@
+uniform texture2d displacement_map;
+uniform float displacement_strength_x;
+uniform float displacement_strength_y;
+uniform int color_space;
+uniform int sampler_mode;
+uniform int displace_mode;
+//----------------------------------------------------------------------------------------------------------------------
+
+// These are required objects for the shader to work.
+// You don't need to change anything here, unless you know what you are doing
+sampler_state textureSampler {
+    Filter    = Linear;
+    AddressU  = Clamp;
+    AddressV  = Clamp;
+};
+
+struct VertData {
+    float2 uv  : TEXCOORD0;
+    float4 pos : POSITION;
+};
+
+struct FragData {
+    float2 uv  : TEXCOORD0;
+};
+
+VertData VSDefault(VertData v_in)
+{
+    VertData vert_out;
+    vert_out.uv  = v_in.uv;
+    vert_out.pos = mul(float4(v_in.pos.xyz, 1.0), ViewProj);
+    return vert_out;
+}
+//----------------------------------------------------------------------------------------------------------------------
+
+float3 rgbToYuv(float3 rgb)
+{
+    return float3(
+        ( 0.257 * rgb.r + 0.504 * rgb.g + 0.098 * rgb.b) / 0.859,
+        (-0.148 * rgb.r - 0.291 * rgb.g + 0.439 * rgb.b) / 0.439,
+        ( 0.439 * rgb.r - 0.368 * rgb.g - 0.071 * rgb.b) / 0.439
+    );
+}
+//----------------------------------------------------------------------------------------------------------------------
+
+float applyBorders_single(float val) {
+    if (val > 1.0) {
+        if (sampler_mode == 0) { // Clamp
+            return 1.0;
+        }
+        else if (sampler_mode == 1) { // Mirror
+            return 1.0 - (val - 1.0);
+        }
+        else { // Repeat
+            return val - floor(val);
+        }
+    }
+    else if (val < 0.0) {
+        if (sampler_mode == 0) { // Clamp
+            return 0.0;
+        }
+        else if (sampler_mode == 1) { // Mirror
+            return -1.0 * val;
+        }
+        else { // Repeat
+            return val - floor(val);
+        }
+    }
+    else {
+        return val;
+    }
+}
+float2 applyBorders(float2 uv) {
+    return float2(
+        applyBorders_single(uv[0]),
+        applyBorders_single(uv[1])
+    );
+}
+
+float4 EffectLinearSingle(float2 uv) {
+    float2 displacement_strength = float2(displacement_strength_x, displacement_strength_y);
+    if (color_space == 0) { // RGB
+        float3 mask = displacement_map.Sample(textureSampler, uv).xyz;
+        mask = srgb_linear_to_nonlinear(mask);
+        mask.xy -= 0.001960784; // half a color step
+        /*if (uv.x < 0.1) {
+            if (uv.y < mask.x) {
+                return displacement_map.Sample(textureSampler, uv); //float4(1.0, 0.0, 0.0, 1.0);
+            }
+        }*/
+        float2 uv2 = uv - displacement_strength*float2((mask.x - 0.5)/0.5, (mask.y - 0.5)/0.5);
+        uv2 = applyBorders(uv2);
+        float4 px = image.Sample(textureSampler, uv2);
+        return px;
+    }
+    else if (color_space == 1) { // YUV
+        float3 mask = displacement_map.Sample(textureSampler, uv).xyz;
+        mask = srgb_linear_to_nonlinear(mask);
+        mask = rgbToYuv(mask);
+        float2 uv2 = uv - displacement_strength*float2(mask.y, mask.z);
+        uv2 = applyBorders(uv2);
+        float4 px = image.Sample(textureSampler, uv2);
+        return px;
+    }
+    else {
+        // Should not happen
+        return image.Sample(textureSampler, uv);
+    }
+}
+
+float4 EffectLinearDual(float2 uv) {
+    float2 displacement_strength = float2(displacement_strength_x, displacement_strength_y);
+    float2 uv_mask = float2(uv[0]*0.5, uv[1]);
+    float4 px;
+    float4 mask = displacement_map.Sample(textureSampler, uv_mask);
+    mask.xyz *= mask[3];
+    mask.xyz = srgb_linear_to_nonlinear(mask.xyz);
+    if (color_space == 0) { // RGB
+        float2 uv2 = uv - displacement_strength*mask[3]*float2((mask.x - 0.5)/0.5, (mask.y - 0.5)/0.5);
+        uv2 = applyBorders(uv2);
+        px = image.Sample(textureSampler, uv2);
+    }
+    else if (color_space == 1) { // YUV
+        float3 mask_yuv = rgbToYuv(mask.rgb);
+        float2 uv2 = uv - displacement_strength*mask[3]*float2(mask_yuv.y, mask_yuv.z);
+        uv2 = applyBorders(uv2);
+        px = image.Sample(textureSampler, uv2);
+    }
+    else {
+        // Should not happen
+        return image.Sample(textureSampler, uv);
+    }
+
+    float4 overlay_px = displacement_map.Sample(textureSampler, uv_mask + float2(0.5, 0.0));
+    return float4(lerp(
+        px.rgb,
+        overlay_px.rgb,
+        overlay_px[3]
+    ), px[3]);
+}
+
+float4 EffectLinear(float2 uv) {
+    if (displace_mode == 0) {
+        return EffectLinearSingle(uv);
+    }
+    else /*if (displace_mode == 1)*/ {
+        return EffectLinearDual(uv);
+    }
+}
+//----------------------------------------------------------------------------------------------------------------------
+
+// You probably don't want to change anything from this point.
+
+float4 PSEffect(FragData f_in) : TARGET
+{
+    float4 rgba = EffectLinear(f_in.uv);
+    return rgba;
+}
+
+technique Draw
+{
+    pass
+    {
+        vertex_shader = VSDefault(v_in);
+        pixel_shader = PSEffect(f_in);
+    }
+}

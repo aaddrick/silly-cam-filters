@@ -1,0 +1,6 @@
+#ifndef SHADERTASTIC_IS_MODULE_LOADED_H
+#define SHADERTASTIC_IS_MODULE_LOADED_H
+
+bool is_module_loaded();
+
+#endif // SHADERTASTIC_IS_MODULE_LOADED_H

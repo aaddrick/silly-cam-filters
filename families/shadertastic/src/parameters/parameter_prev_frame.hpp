@@ -1,0 +1,133 @@
+/******************************************************************************
+    Copyright (C) 2023 by xurei <xureilab@gmail.com>
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 2 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+******************************************************************************/
+
+#ifndef SHADERTASTIC_PARAMETER_PREV_FRAME_HPP
+#define SHADERTASTIC_PARAMETER_PREV_FRAME_HPP
+
+#include <string>
+#include "parameter.hpp"
+#include "../util/string_util.h"
+#include "../util/file_util.h"
+#include "../util/resource_util.hpp"
+
+namespace effect_parameter_prev_frame_detail {
+    using base_param = effect_param_with_no_prop<effect_parameter>;
+}
+class effect_parameter_prev_frame : public effect_parameter_prev_frame_detail::base_param {
+    private:
+        int step_{};
+
+        gs_texrender_t *prev_texrender[2]{ nullptr, nullptr };
+        int prev_texrender_buffer = 0;
+
+    public:
+        explicit effect_parameter_prev_frame(gs_eparam_t *shader_param) : effect_parameter_prev_frame_detail::base_param(sizeof(float), shader_param) {
+        }
+
+        ~effect_parameter_prev_frame() override {
+            release_texrenders();
+        }
+
+        inline void init_texrenders() {
+            obs_enter_graphics();
+            if (prev_texrender[0] == nullptr) {
+                prev_texrender[0] = gs_texrender_create(GS_RGBA16, GS_ZS_NONE);
+            }
+            if (prev_texrender[1] == nullptr) {
+                prev_texrender[1] = gs_texrender_create(GS_RGBA16, GS_ZS_NONE);
+            }
+            obs_leave_graphics();
+        }
+
+        inline void release_texrenders() {
+            obs_enter_graphics();
+            {
+                release_resource(gs_texrender_destroy, prev_texrender[0]);
+                release_resource(gs_texrender_destroy, prev_texrender[1]);
+            }
+            obs_leave_graphics();
+        }
+
+        [[nodiscard]] effect_param_datatype type() const override {
+            return PARAM_DATATYPE_PREV_FRAME;
+        }
+
+        [[nodiscard]] int step() const {
+            return step_;
+        }
+
+        void initialize_params(const std::string &effect_name, const effect_shader *shader, json_t *metadata, const std::string &effect_path) override {
+            UNUSED_PARAMETER(effect_name);
+            UNUSED_PARAMETER(shader);
+            UNUSED_PARAMETER(effect_path);
+
+            json_t *step_json = json_object_get(metadata, "step");
+            step_ = json_is_integer(step_json) ? (int)json_integer_value(step_json) : -1;
+        }
+
+        void try_gs_set_val() override {
+            //debug("try_gs_set_val %i", prev_texrender_buffer);
+            if (!prev_texrender[prev_texrender_buffer]) {
+                return;
+            }
+            try_gs_effect_set_texture(name.c_str(), shader_param, gs_texrender_get_texture(prev_texrender[prev_texrender_buffer]));
+        }
+
+        void reset() {
+            release_texrenders();
+            init_texrenders();
+        }
+
+        bool attach(const uint32_t cx, const uint32_t cy, const gs_color_space source_space) {
+            const int next_texrender_buffer = prev_texrender_buffer ^ 1;
+            //debug("attach %i", prev_texrender_buffer);
+
+            //init_texrenders(); // Probably not required, but ensures there is a texrender
+
+            gs_texrender_reset(prev_texrender[next_texrender_buffer]);
+            bool texrender_ok = gs_texrender_begin_with_color_space(prev_texrender[next_texrender_buffer], cx, cy, source_space);
+            if (texrender_ok) {
+                constexpr vec4 clear_color{0,0,0,0};
+                gs_clear(GS_CLEAR_COLOR, &clear_color, 0.0f, 0);
+                gs_ortho(0.0f, (float)cx, 0.0f, (float)cy, -100.0f, 100.0f);
+            }
+            else {
+                debug("effect_parameter_prev_frame: cannot begin texrender");
+            }
+            return texrender_ok;
+        }
+
+        const gs_texrender_t * detach() {
+            const int next_texrender_buffer = prev_texrender_buffer ^ 1;
+            gs_texrender_end(prev_texrender[next_texrender_buffer]);
+            return prev_texrender[next_texrender_buffer];
+        }
+
+        void show() override {
+            init_texrenders();
+        }
+
+        void hide() override {
+            release_texrenders();
+        }
+
+        void next_frame() {
+            prev_texrender_buffer = prev_texrender_buffer ^ 1;
+        }
+};
+
+#endif // SHADERTASTIC_PARAMETER_PREV_FRAME_HPP

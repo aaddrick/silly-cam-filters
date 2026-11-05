@@ -1,0 +1,62 @@
+/******************************************************************************
+    Copyright (C) 2023 by xurei <xureilab@gmail.com>
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 2 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+******************************************************************************/
+
+#ifndef SHADERTASTIC_PARAMETER_UNKNOWN_HPP
+#define SHADERTASTIC_PARAMETER_UNKNOWN_HPP
+
+namespace effect_parameter_unknown_detail {
+    using base_param = effect_param_with_unique_prop<effect_parameter>;
+}
+class effect_parameter_unknown : public effect_parameter_unknown_detail::base_param {
+    public:
+        explicit effect_parameter_unknown(gs_eparam_t *shader_param) : effect_parameter_unknown_detail::base_param(sizeof(int), shader_param) {
+        }
+
+        [[nodiscard]] effect_param_datatype type() const override {
+            return PARAM_DATATYPE_UNKNOWN;
+        }
+
+        void initialize_params(const std::string &effect_name, const effect_shader *shader, json_t *metadata, const std::string &effect_path) override {
+            UNUSED_PARAMETER(effect_name);
+            UNUSED_PARAMETER(shader);
+            UNUSED_PARAMETER(metadata);
+            UNUSED_PARAMETER(effect_path);
+        }
+
+        void set_default(obs_data_t *settings, const char *effect_name) override {
+            UNUSED_PARAMETER(settings);
+            UNUSED_PARAMETER(effect_name);
+        }
+
+        void render_property_ui(const char *effect_name, obs_properties_t *props) override {
+            std::string full_param_name = get_full_param_name(effect_name);
+            obs_properties_add_text(
+                props,
+                full_param_name.c_str(),
+                (std::string("Unknown type for ") + std::string(full_param_name)).c_str(),
+                OBS_TEXT_INFO
+            );
+        }
+
+        void set_data_from_settings(obs_data_t *settings, const char *effect_name) override {
+            UNUSED_PARAMETER(settings);
+            UNUSED_PARAMETER(effect_name);
+            *((int*)this->data) = 0;
+        }
+};
+
+#endif // SHADERTASTIC_PARAMETER_UNKNOWN_HPP

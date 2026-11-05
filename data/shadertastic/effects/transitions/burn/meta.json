@@ -1,0 +1,32 @@
+{
+  "about": {
+    "author_name": "xurei",
+    "author_url": "http://about.xurei.io"
+  },
+  "metafileVersion": 1,
+  "label": "Burn",
+  "revision": 2,
+  "steps": 1,
+  "parameters": [
+    {
+      "name": "smooth_level",
+      "label": "Smooth level",
+      "type": "float",
+      "slider": true,
+      "min": 0.0,
+      "max": 1.0,
+      "step": 0.01,
+      "default": 0.1
+    },
+    {
+      "name": "random_noise",
+      "label": "Random Noise",
+      "type": "float",
+      "slider": true,
+      "min": 0.0,
+      "max": 1.0,
+      "step": 0.01,
+      "default": 0.1
+    }
+  ]
+}

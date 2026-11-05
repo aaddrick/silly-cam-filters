@@ -1,0 +1,261 @@
+/******************************************************************************
+    Copyright (C) 2023 by xurei <xureilab@gmail.com>
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 2 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+******************************************************************************/
+
+#ifndef SHADERTASTIC_PARAMETER_IMAGE_HPP
+#define SHADERTASTIC_PARAMETER_IMAGE_HPP
+
+#include <string>
+#include "parameter.hpp"
+#include "../util/string_util.h"
+#include "../util/file_util.h"
+#include "../util/resource_util.hpp"
+
+namespace effect_parameter_image_detail {
+    using base_param = effect_parameter;
+
+    struct image_value {
+        std::string label;
+        std::string value{};
+    };
+}
+class effect_parameter_image : public effect_parameter_image_detail::base_param {
+    private:
+        static constexpr char PARAM_STR_SIZE[] = "size";
+        static constexpr char PARAM_STR_CUSTOM_SETTING[] = "__custom";
+        static constexpr char PARAM_STR_CUSTOM_VALUE[] = "__CUSTOM__";
+
+        std::string default_value;
+        std::vector<effect_parameter_image_detail::image_value> values;
+        bool allow_custom{};
+        bool hidden{};
+
+        std::string path;
+        gs_texture_t * texture;
+        gs_eparam_t *param_texture_size{};
+
+        void load_texture() {
+            obs_enter_graphics();
+            {
+                release_resource(gs_texture_destroy, this->texture);
+                if (starts_with(path, "bundle://")) {
+                    std::string temp_file_path = create_temp_file();
+                    extract_file_zipped_or_local(path.substr(9), temp_file_path);
+                    this->texture = gs_texture_create_from_file(temp_file_path.c_str());
+                    std::remove(temp_file_path.c_str());
+                }
+                else {
+                    this->texture = gs_texture_create_from_file(path.c_str());
+                }
+            }
+            obs_leave_graphics();
+        }
+
+    public:
+        explicit effect_parameter_image(gs_eparam_t *shader_param) : effect_parameter_image_detail::base_param(sizeof(float), shader_param) {
+            this->texture = nullptr;
+        }
+
+        ~effect_parameter_image() override {
+            obs_enter_graphics();
+            {
+                release_resource(gs_texture_destroy, this->texture);
+            }
+            obs_leave_graphics();
+        }
+
+        [[nodiscard]] effect_param_datatype type() const override {
+            return PARAM_DATATYPE_IMAGE;
+        }
+
+        void initialize_params(const std::string &effect_name, const effect_shader *shader, json_t *metadata, const std::string &effect_path) override {
+            UNUSED_PARAMETER(effect_name);
+            UNUSED_PARAMETER(shader);
+
+            json_t *default_json = json_object_get(metadata, "default");
+            const char *default_file = json_is_string(default_json) ? json_string_value(default_json) : "";
+            if (default_file[0] != '\0') {
+                default_value = std::string("bundle://") + effect_path + '/' + default_file;
+            }
+            else {
+                default_value = "";
+            }
+
+            json_t *allow_custom_json = json_object_get(metadata, "allow_custom");
+            allow_custom = json_is_boolean(allow_custom_json) ? json_boolean_value(allow_custom_json) : true;
+
+            json_t *hidden_json = json_object_get(metadata, "hidden");
+            hidden = json_is_boolean(hidden_json) ? json_boolean_value(hidden_json) : false;
+
+            json_t *array = json_object_get(metadata, "values");
+            size_t array_count = json_is_array(array) ? json_array_size(array) : 0;
+            values.resize(array_count);
+            for (size_t i=0; i<array_count; ++i) {
+                json_t *item = json_array_get(array, i);
+                json_t *label_json = json_object_get(item, "label");
+                json_t *value_json = json_object_get(item, "value");
+                values[i].label = json_is_string(label_json) ? json_string_value(label_json) : "";
+                const char *val = json_is_string(value_json) ? json_string_value(value_json) : "";
+                if (val == nullptr || strlen(val) == 0) {
+                    values[i].value = std::string("");
+                }
+                else {
+                    values[i].value = std::string("bundle://") + effect_path + '/' + val;
+                }
+            }
+            if (values.empty()) {
+                warn("Parameter %s does not allow custom images nor provides any predefined ones. Custom images are forced.", name.c_str());
+                allow_custom = true;
+            }
+
+            std::string texture_size = get_full_subparam_name_static(name, PARAM_STR_SIZE);
+            param_texture_size = shader->get_param_by_name(texture_size.c_str());
+        }
+
+        void set_default(obs_data_t *settings, const char *effect_name) override {
+            std::string full_param_name = get_full_param_name(effect_name);
+            std::string full_param_name_list = full_param_name + "__list";
+            obs_data_set_default_string(settings, full_param_name.c_str(), default_value.c_str());
+            obs_data_set_default_string(settings, full_param_name_list.c_str(), default_value.c_str());
+        }
+
+        void render_property_ui(const char *effect_name, obs_properties_t *props) override {
+            std::string full_param_name = get_full_param_name(effect_name);
+            std::string full_param_name_filepicker = full_param_name + PARAM_STR_CUSTOM_SETTING;
+            bool with_values = !values.empty();
+
+            // If values are present, show a list widget to select them
+            if (with_values) {
+                auto *images_prop = obs_properties_add_list(
+                    props,
+                    full_param_name.c_str(),
+                    label.c_str(),
+                    OBS_COMBO_TYPE_LIST,
+                    OBS_COMBO_FORMAT_STRING
+                );
+                obs_property_set_visible(images_prop, !hidden);
+
+                for (size_t i=0; i < values.size(); ++i) {
+                    obs_property_list_add_string(images_prop, values[i].label.c_str(), values[i].value.c_str());
+                }
+                if (allow_custom) {
+                    obs_property_list_add_string(images_prop, "Use custom file", PARAM_STR_CUSTOM_VALUE);
+
+                    // FIXME if the effect attempts to use this param in a condition, this will be overridden... It does not make sense to do that, though, but it's allowed
+                    obs_property_set_modified_callback(images_prop, [](obs_properties_t *props, obs_property_t *property, obs_data_t *settings) {
+                        const char *full_param_name = obs_property_name(property);
+
+                        std::string new_value = std::string(obs_data_get_string(settings, full_param_name));
+
+                        std::string full_param_name_filepicker = std::string(full_param_name) + PARAM_STR_CUSTOM_SETTING;
+                        obs_property_t *filepicker = obs_properties_get(props, full_param_name_filepicker.c_str());
+
+                        if (new_value == PARAM_STR_CUSTOM_VALUE) {
+                            obs_property_set_visible(filepicker, true);
+                        }
+                        else {
+                            obs_property_set_visible(filepicker, false);
+                        }
+                        return true; // TODO maybe a false is okay, to be confirmed
+                    });
+                }
+            }
+
+            // If custom value is allowed, add a file picker widget
+            // It will be masked if values are present and the "Select File..." item is not selected
+            if (allow_custom) {
+                obs_properties_add_path(
+                    props,
+                    with_values ? full_param_name_filepicker.c_str() : full_param_name.c_str(),
+                    with_values ? "∟ Custom file" : label.c_str(),
+                    OBS_PATH_FILE,
+                    "Image (*.jpg *.jpeg *.png *.bmp)",
+                    nullptr
+                );
+            }
+
+            // TODO description si not user-friendly in the UI now, commented-out for now
+            //if (!description.empty()) {
+            //    obs_property_set_long_description(filepicker, obs_module_text(description.c_str()));
+            //}
+        }
+
+        void apply_visible(const char *effect_name, obs_properties_t *props, const bool visible) override {
+            std::string full_param_name = get_full_param_name(effect_name);
+            auto *source_prop = obs_properties_get(props, full_param_name.c_str());
+            if (source_prop != nullptr) {
+                obs_property_set_visible(source_prop, visible);
+            }
+
+            if (allow_custom) {
+                std::string full_param_name_filepicker = std::string(full_param_name) + PARAM_STR_CUSTOM_SETTING;
+                auto *smoothing_prop = obs_properties_get(props, full_param_name_filepicker.c_str());
+                if (smoothing_prop != nullptr) {
+                    obs_property_set_visible(smoothing_prop, visible);
+                }
+            }
+        }
+
+        void set_data_from_settings(obs_data_t *settings, const char *full_param_name) override {
+            bool with_values = !values.empty();
+
+            if (with_values) {
+                const char *path_ = obs_data_get_string(settings, full_param_name);
+                if (strcmp(path_, PARAM_STR_CUSTOM_VALUE) == 0) {
+                    std::string full_param_name_filepicker = std::string(full_param_name) + PARAM_STR_CUSTOM_SETTING;
+                    set_data_from_settings_sub(settings, full_param_name_filepicker.c_str());
+                    return;
+                }
+            }
+
+            set_data_from_settings_sub(settings, full_param_name);
+        }
+
+        void set_data_from_settings_sub(obs_data_t *settings, const char *effect_name) {
+            std::string full_param_name = get_full_param_name(effect_name);
+            const char *path_ = obs_data_get_string(settings, full_param_name.c_str());
+            if (path_ != nullptr) {
+                std::string path_str = std::string(path_);
+                if (this->path != path_str) {
+                    this->path = path_str;
+                    this->load_texture();
+                }
+            }
+            else {
+                if (this->texture != nullptr) {
+                    this->path = "";
+                }
+                obs_enter_graphics();
+                {
+                    release_resource(gs_texture_destroy, this->texture);
+                }
+                obs_leave_graphics();
+            }
+        }
+
+        void try_gs_set_val() override {
+            try_gs_effect_set_texture_srgb(name.c_str(), shader_param, this->texture)
+
+            vec2 tex_size = {
+                .x = (float)gs_texture_get_width(texture),
+                .y = (float)gs_texture_get_height(texture),
+            };
+            std::string texture_size = get_full_subparam_name_static(name, PARAM_STR_SIZE);
+            try_gs_effect_set_vec2(texture_size, param_texture_size, &tex_size);
+        }
+};
+
+#endif // SHADERTASTIC_PARAMETER_IMAGE_HPP

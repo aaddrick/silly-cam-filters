@@ -1,0 +1,12 @@
+{
+  "about": {
+    "author_name": "xurei",
+    "author_url": "http://about.xurei.io"
+  },
+  "metafileVersion": 1,
+  "label": "Color invert",
+  "revision": 1,
+  "steps": 1,
+  "parameters": [
+  ]
+}

@@ -1,0 +1,71 @@
+{
+  "about": {
+    "author_name": "xurei",
+    "author_url": "http://about.xurei.io"
+  },
+  "metafileVersion": 1,
+  "label": "[Face Tracking] Reference",
+  "steps": 1,
+  "parameters": [
+    {
+      "type": "facetracking",
+      "name": "facetracking",
+      "use_preraster": true,
+      "reset_on_face_lost": {
+        "prompt": true,
+        "default": true
+      }
+    },
+    {
+      "name": "show_mesh_face",
+      "label": "Show face mesh points",
+      "type": "bool",
+      "default": true
+    },
+    {
+      "name": "show_mesh_lips",
+      "label": "Show lips mesh points",
+      "type": "bool",
+      "default": true
+    },
+    {
+      "name": "show_eyes",
+      "label": "Show eyes points",
+      "type": "bool",
+      "default": true
+    },
+    {
+      "name": "show_eyes_balls",
+      "label": "Show eyes balls",
+      "type": "bool",
+      "default": false
+    },
+    {
+      "name": "show_bounding_box",
+      "label": "Show bounding box",
+      "type": "bool",
+      "default": true
+    },
+    {
+      "name": "show_tex",
+      "label": "Show produced texture",
+      "type": "bool",
+      "default": true
+    },
+    {
+      "name": "show_mesh_preraster",
+      "label": "Show face preraster",
+      "type": "bool",
+      "default": false
+    },
+    {
+      "name": "base_mult",
+      "label": "Non-face mult",
+      "type": "float",
+      "min": 0.0,
+      "max": 1.0,
+      "slider": true,
+      "default": 0.9
+    }
+  ]
+}

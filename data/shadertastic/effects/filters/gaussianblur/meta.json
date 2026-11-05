@@ -1,0 +1,44 @@
+{
+  "about": {
+    "author_name": "xurei",
+    "author_url": "http://about.xurei.io"
+  },
+  "metafileVersion": 1,
+  "label": "Gaussian Blur",
+  "revision": 2,
+  "steps": 2,
+  "parameters": [
+    {
+      "name": "blur_level_x",
+      "label": "Blur level (X)",
+      "type": "int",
+      "slider": true,
+      "min": 1,
+      "max": 100,
+      "default": 10
+    },
+    {
+      "name": "blur_level_y",
+      "label": "Blur level (Y)",
+      "type": "int",
+      "slider": true,
+      "min": 1,
+      "max": 100,
+      "default": 10
+    },
+    {
+      "name": "sigma",
+      "label": "Sigma",
+      "type": "float",
+      "slider": true,
+      "min": 2.0,
+      "max": 5.0,
+      "default": 1.0
+    },
+    {
+      "name": "sigma_text",
+      "type": "text",
+      "value": "Higher is smoother, but has a shorter range"
+    }
+  ]
+}

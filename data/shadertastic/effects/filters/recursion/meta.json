@@ -1,0 +1,117 @@
+{
+  "metafileVersion": 1,
+  "about": {
+    "author_name": "xurei",
+    "author_url": "http://about.xurei.io"
+  },
+  "label": "Recursion",
+  "revision": 2,
+  "steps": 2,
+  "parameters": [
+    {
+      "name": "prev_image",
+      "type": "prev_frame",
+      "step": 0
+    },
+    {
+      "type": "text",
+      "name": "info_text",
+      "value": "<b>NOTICE:</b> this effect only works with sources with transparency."
+    },
+    {
+      "name": "prev_alpha",
+      "label": "Recursion alpha",
+      "description": "",
+      "type": "float",
+      "min": 0.0,
+      "max": 1.0,
+      "step": 0.001,
+      "slider": true,
+      "default": 1.0
+    },
+    {
+      "name": "zoom",
+      "label": "Zoom",
+      "type": "float",
+      "min": -1.0,
+      "max": 1.0,
+      "step": 0.001,
+      "slider": true,
+      "default": 0.100
+    },
+    {
+      "name": "center_x",
+      "label": "Center X",
+      "type": "float",
+      "min": 0.0,
+      "max": 1.0,
+      "step": 0.001,
+      "slider": true,
+      "default": 0.5
+    },
+    {
+      "name": "center_y",
+      "label": "Center Y",
+      "type": "float",
+      "min": 0.0,
+      "max": 1.0,
+      "step": 0.001,
+      "slider": true,
+      "default": 0.5
+    },
+    {
+      "name": "smoothing_mode",
+      "label": "Smoothing",
+      "type": "list_int",
+      "values": [
+        {
+          "label": "None",
+          "value": 0
+        },
+        {
+          "label": "9-pixels average",
+          "value": 1
+        }
+      ],
+      "default": 1
+    },
+    {
+      "type": "list_int",
+      "name": "superposition_mode",
+      "label": "Mode:",
+      "values": [
+        {
+          "value": 0,
+          "label": "Source above"
+        },
+        {
+          "value": 1,
+          "label": "Source below"
+        }
+      ],
+      "default": 0
+    },
+    {
+      "type": "list_int",
+      "name": "reset_on_toggle",
+      "label": "On filter visibility toggle:",
+      "values": [
+        {
+          "value": 0,
+          "label": "Reset"
+        },
+        {
+          "value": 1,
+          "label": "Keep"
+        }
+      ],
+      "default": 0
+    },
+    {
+      "name": "show_debug_point",
+      "label": "Show debug elements",
+      "type": "bool",
+      "default": false
+    }
+  ]
+}

@@ -1,0 +1,449 @@
+/******************************************************************************
+    Copyright (C) 2023 by xurei <xureilab@gmail.com>
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 2 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+******************************************************************************/
+
+#include <graphics/graphics.h>
+#include <graphics/vec2.h>
+#include <obs-module.h>
+#include <onnxruntime_cxx_api.h>
+#include <opencv2/core.hpp>
+#include <thread>
+#include <util/bmem.h>
+
+#include "onnxmediapipe/face_landmarks_triangles.h"
+#include "onnxmediapipe/models_provider.h"
+
+#include "src/logging_functions.hpp"
+#include "src/settings.h"
+#include "src/shadertastic.hpp"
+#include "src/util/bit_conversion.h"
+#include "src/util/rgba_to_rgb.h"
+#include "src/util/texture_util.h"
+#include "src/util/time_util.hpp"
+
+#include "face_tracking.h"
+#include "face_tracking_points.h"
+
+// Globals
+static const cv::Mat failed(0, 0, CV_8UC1);
+//----------------------------------------------------------------------------------------------------------------------
+
+void face_tracking_copy_points(onnxmediapipe::FaceLandmarksResults *facelandmark_results, float *points) {
+    for (size_t i=0; i < refined_landmarks_num_points; ++i) {
+        points[i*4+0] = facelandmark_results->refined_landmarks[i].x;
+        points[i*4+1] = facelandmark_results->refined_landmarks[i].y;
+        points[i*4+2] = facelandmark_results->refined_landmarks[i].z;
+        points[i*4+3] = 0.00000;
+    }
+}
+//----------------------------------------------------------------------------------------------------------------------
+
+face_tracking_bounding_box face_tracking_get_bounding_box(onnxmediapipe::FaceLandmarksResults *facelandmark_results, const unsigned short int *indices, int nb_indices) {
+    cv::Point2f minPoint(std::numeric_limits<float>::max(), std::numeric_limits<float>::max());
+    cv::Point2f maxPoint(std::numeric_limits<float>::min(), std::numeric_limits<float>::min());
+
+    for (int i=0; i<nb_indices; ++i) {
+        const size_t landmark_i = indices[i];
+        if (landmark_i < refined_landmarks_num_points) {
+            auto &k = facelandmark_results->refined_landmarks[landmark_i];
+            minPoint.x = std::min(minPoint.x, k.x);
+            minPoint.y = std::min(minPoint.y, k.y);
+
+            maxPoint.x = std::max(maxPoint.x, k.x);
+            maxPoint.y = std::max(maxPoint.y, k.y);
+        }
+    }
+
+    face_tracking_bounding_box out{
+        minPoint.x, minPoint.y,
+        maxPoint.x, maxPoint.y
+    };
+    return out;
+}
+//----------------------------------------------------------------------------------------------------------------------
+
+void face_tracking_create(std::unique_ptr<face_tracking_state> &s) {
+    debug('face_tracking_create');
+    s.reset(new face_tracking_state);
+
+    for (size_t i = 0; i < refined_landmarks_num_points * 3; ++i) {
+        s->filters[i].setFrequency((float)std::max(1.0, obs_get_active_fps()));
+        s->filters[i].setMinCutoff(10.0f);
+        s->filters[i].setBeta(0.007f);
+        s->filters[i].setDerivateCutoff(10.0f);
+    }
+
+    onnxmediapipe::ModelsProvider::initialize();
+
+    s->crop_shader = std::make_unique<FaceTrackingCropShader>();
+
+    obs_enter_graphics();
+    {
+        s->facedetection_texrender = gs_texrender_create(GS_RGBA32F, GS_ZS_NONE);
+    }
+    obs_leave_graphics();
+    //debug("STAGING TEXTURE = %p", s->staging_texture)
+    // ;
+
+    /** Configure networks **/
+    try {
+        s->facemesh = std::make_shared <onnxmediapipe::FaceMesh>();
+    }
+    catch (const std::exception& error) {
+        blog(LOG_INFO, "in detection inference creation, exception: %s", error.what());
+    }
+}
+//----------------------------------------------------------------------------------------------------------------------
+
+uint2 scaledown_aspectratio(uint32_t cx, uint32_t cy, uint32_t max_size) {
+    if (cx == 0 && cy == 0) {
+        return uint2 {
+            .x = 192,
+            .y = 192,
+        };
+    }
+    if (cx > cy) {
+        return uint2 {
+            .x = max_size,
+            .y = (cy * max_size) / cx,
+        };
+    }
+    else {
+        return uint2 {
+            .x = (cx * max_size) / cy,
+            .y = max_size,
+        };
+    }
+}
+
+void cartesian_to_spherical(const cv::Vec3f &v, float a[2]) {
+    const float x = v[0];
+    const float y = v[1];
+    const float z = v[2];
+
+    const float r2 = x*x + y*y + z*z;
+    const float eps = 1e-8f;
+
+    float r_inv = 0.0f;
+    if (r2 > eps) {
+        r_inv = 1.0f / std::sqrt(r2);
+    }
+
+    const float nz = z * r_inv;
+    a[0] = std::acos(nz);    // theta
+    a[1] = std::atan2(y, x); // phi
+}
+static inline cv::Vec3f load_point(const float* data, int idx)
+{
+    const float* p = data + idx * 4;
+    return cv::Vec3f(p[0], p[1], p[2]);
+}
+void face_tracking_compute_normals(float* points, int nb_points, const cv::Vec3i* triangles, int nb_triangles) {
+    std::vector<cv::Vec3f> out_normals;
+    out_normals.assign(nb_points, cv::Vec3f(0.0f, 0.0f, 0.0f));
+
+    for (int i = 0; i < nb_triangles; ++i) {
+        const cv::Vec3i& t = triangles[i];
+
+        int i0 = t[0];
+        int i1 = t[1];
+        int i2 = t[2];
+
+        cv::Vec3f p0 = load_point(points, i0);
+        cv::Vec3f p1 = load_point(points, i1);
+        cv::Vec3f p2 = load_point(points, i2);
+
+        //cv::Vec3f n = cv::cross(p1 - p0, p2 - p0); // area-weighted normal
+        cv::Vec3f n = (p1 - p0).cross(p2 - p0); // area-weighted normal
+
+        out_normals[i0] += n;
+        out_normals[i1] += n;
+        out_normals[i2] += n;
+    }
+
+    for (uint32_t i = 0; i < refined_landmarks_num_points; ++i) {
+        auto &n = out_normals[i];
+        n = normalize(n);
+
+        float buf[2];
+        cartesian_to_spherical(n, buf);
+        buf[0] += M_PI; buf[0] /= 2*M_PI;
+        buf[1] += M_PI; buf[1] /= 2*M_PI;
+        buf[1] += 0.5; buf[1] = buf[1] > 1.0f ? buf[1] - 1.0f : buf[1];
+
+        auto packed = pack2f1i(buf[0], buf[1]);
+        points[i * 4 + 3] = pack1i1f(packed);
+    }
+}
+
+void face_tracking_tick(face_tracking_state *s, gs_texture_t *source_tex, const float deltatime) {
+    #ifdef DEV_MODE
+    unsigned long tic = get_time_us();
+    #endif
+    auto facemesh = s->facemesh;
+    if (!facemesh) {
+        return;
+    }
+
+    size_t results_index = 0;
+
+    bool face_found = true;
+
+    // Scaling down cx and cy to make them fit in 192x192
+    const uint32_t cx = gs_texture_get_width(source_tex);
+    const uint32_t cy = gs_texture_get_height(source_tex);
+    uint2 texrender_size_for_detection = scaledown_aspectratio(cx, cy, 192);
+
+    bool prev_facelandmark_results_display_results = s->facelandmark_results_display_results;
+
+    debug_trace("A %lu", get_time_us()-tic);
+
+    if (facemesh->IsFaceDetectionNeeded()) {
+        cv::Mat imageBGR = face_tracking_get_image_for_detection(s, source_tex, texrender_size_for_detection);
+
+        if (imageBGR.empty()) {
+            log_error("Something went wrong with the extraction of the source texture");
+            face_found = false;
+        }
+        else {
+            face_found = facemesh->RunFaceDetection(imageBGR);
+        }
+        return;
+    }
+    debug_trace("B %lu", get_time_us()-tic);
+    s->facelandmark_results_display_results = face_found;
+
+    if (face_found) {
+        float2 roi_size = facemesh->getROISize();
+        float2 roi_center = facemesh->getROICenter();
+        float rotation = facemesh->getROIRotation();
+
+        debug_trace("C %lu", get_time_us()-tic);
+
+        // Scaling down cx and cy to make them fit in 192x192
+        cv::Mat imageBGR = face_tracking_get_image_for_mesh(s, source_tex, roi_center, roi_size, rotation);
+        debug_trace("D %lu", get_time_us()-tic);
+
+        if (imageBGR.empty()) {
+            log_error("Something went wrong with the extraction of the face to mesh");
+            s->facelandmark_results_display_results = false;
+        }
+        else {
+            s->facelandmark_results_display_results = facemesh->Run(imageBGR, (int)cx, (int)cy, s->facelandmark_results[results_index]);
+        }
+        debug_trace("E %lu", get_time_us()-tic);
+    }
+
+    if (!s->facelandmark_results_display_results && prev_facelandmark_results_display_results) {
+        debug("lost track !");
+    }
+
+    if (!s->facelandmark_results_display_results) {
+        /* nothing to do */
+    }
+    else {
+        debug_trace("F %lu", get_time_us()-tic);
+        if (shadertastic_settings().one_euro_enabled) {
+            for (size_t i = 0; i < refined_landmarks_num_points; ++i) {
+                s->filters[i * 3 + 0].setMinCutoff(std::max(0.00001f, shadertastic_settings().one_euro_min_cutoff));
+                s->filters[i * 3 + 0].setBeta(std::max(0.0001f, shadertastic_settings().one_euro_beta));
+                s->filters[i * 3 + 0].setDerivateCutoff(std::max(0.01f, shadertastic_settings().one_euro_deriv_cutoff));
+                s->filters[i * 3 + 1].setMinCutoff(std::max(0.00001f, shadertastic_settings().one_euro_min_cutoff));
+                s->filters[i * 3 + 1].setBeta(std::max(0.0001f, shadertastic_settings().one_euro_beta));
+                s->filters[i * 3 + 1].setDerivateCutoff(std::max(0.01f, shadertastic_settings().one_euro_deriv_cutoff));
+                s->filters[i * 3 + 2].setMinCutoff(std::max(0.00001f, shadertastic_settings().one_euro_min_cutoff));
+                s->filters[i * 3 + 2].setBeta(std::max(0.0001f, shadertastic_settings().one_euro_beta));
+                s->filters[i * 3 + 2].setDerivateCutoff(std::max(0.01f, shadertastic_settings().one_euro_deriv_cutoff));
+                s->average_results.refined_landmarks[i].x = s->filters[i * 3 + 0].filter(s->facelandmark_results[results_index].refined_landmarks[i].x, deltatime);
+                s->average_results.refined_landmarks[i].y = s->filters[i * 3 + 1].filter(s->facelandmark_results[results_index].refined_landmarks[i].y, deltatime);
+                s->average_results.refined_landmarks[i].z = s->filters[i * 3 + 2].filter(s->facelandmark_results[results_index].refined_landmarks[i].z, deltatime);
+            }
+        }
+        else {
+            for (size_t i = 0; i < facial_surface_num_points; ++i) {
+                s->average_results.facial_surface[i].x = 0.0;
+                s->average_results.facial_surface[i].y = 0.0;
+                s->average_results.facial_surface[i].z = 0.0;
+                size_t count = 0;
+                for (size_t j = 0; j < FACEDETECTION_NB_ITERATIONS; ++j) {
+                    s->average_results.facial_surface[i] += s->facelandmark_results[j].facial_surface[i];
+                    ++count;
+                }
+                s->average_results.facial_surface[i] /= (float) count;
+            }
+            for (size_t i = 0; i < refined_landmarks_num_points; ++i) {
+                s->average_results.refined_landmarks[i].x = 0.0;
+                s->average_results.refined_landmarks[i].y = 0.0;
+                s->average_results.refined_landmarks[i].z = 0.0;
+                size_t count = 0;
+                for (size_t j = 0; j < FACEDETECTION_NB_ITERATIONS; ++j) {
+                    s->average_results.refined_landmarks[i] += s->facelandmark_results[j].refined_landmarks[i];
+                    ++count;
+                }
+                s->average_results.refined_landmarks[i] /= (float) count;
+            }
+        }
+        debug_trace("G %lu", get_time_us()-tic);
+
+        float points[refined_landmarks_num_points * 4];
+        // TODO we could simplify this by using Point4f directly, but it takes ~15µs to copy the points, probably worthless
+        face_tracking_copy_points(&s->average_results, points);
+
+        std::vector<cv::Vec3f> normals;
+        face_tracking_compute_normals(
+            points, refined_landmarks_num_points,
+            onnxmediapipe::face_triangles, onnxmediapipe::nb_face_triangles
+        );
+
+        debug_trace("G1 %lu", get_time_us()-tic);
+
+        // CPU Preraster (kept for debugging and comparing with GPU raster)
+        //cv::Mat preraster = face_tracking_raster_mesh_uv(
+        //    s->average_results.refined_landmarks,
+        //    onnxmediapipe::face_triangles,
+        //    (int)cx,
+        //    (int)cy
+        //);
+
+        //{
+        //    auto matA = extractImage(gs_texrender_get_texture(raster_texrender));
+        //    saveMat(matA, "/home/olivier/obs-plugins/obs-shadertastic/plugin/lab/debug_images/tex_a.png");
+        //    saveMat(preraster, "/home/olivier/obs-plugins/obs-shadertastic/plugin/lab/debug_images/tex_a_comp.png");
+        //    debug("ok");
+        //}
+
+        debug_trace("G2 %lu", get_time_us()-tic);
+        obs_enter_graphics();
+        {
+            if (!s->fd_points_texture) {
+                s->fd_points_texture = gs_texture_create(refined_landmarks_num_points, 4, GS_RGBA32F, 1, nullptr, GS_DYNAMIC);
+            }
+
+            float *texpoints;
+            uint32_t linesize2 = 0;
+            gs_texture_map(s->fd_points_texture, (uint8_t **)(&texpoints), &linesize2);
+            float *row0 = (float *)((uint8_t *)texpoints + 0 * linesize2);
+            float *row1 = (float *)((uint8_t *)texpoints + 1 * linesize2);
+            float *row2 = (float *)((uint8_t *)texpoints + 2 * linesize2);
+            float *row3 = (float *)((uint8_t *)texpoints + 3 * linesize2);
+
+            // Fill in the first row with the detected points
+            memcpy(row0, points, refined_landmarks_num_points * 4 * sizeof(float));
+
+            // Fill in the 2nd and 3rd rows of the texture with the triangle map
+            for (size_t tri_id = 0; tri_id < onnxmediapipe::nb_face_triangles; ++tri_id) {
+                auto tri = onnxmediapipe::face_triangles[tri_id];
+                float tri_f[4] = {
+                    ((float)tri[0] + 0.5f) / 478.0f,
+                    ((float)tri[1] + 0.5f) / 478.0f,
+                    ((float)tri[2] + 0.5f) / 478.0f,
+                    1.0f
+                };
+
+                float *row = tri_id < refined_landmarks_num_points ? row1 : row2;
+                memcpy(&row[(tri_id%refined_landmarks_num_points)*4], tri_f, 4 * sizeof(float));
+            }
+
+            // Fill in the last row of the texture with the point from the original model
+            memcpy(row3, facetracking_points_data, refined_landmarks_num_points * 4 * sizeof(float));
+
+            gs_texture_unmap(s->fd_points_texture);
+        }
+        obs_leave_graphics();
+        debug_trace("H %lu", get_time_us()-tic);
+
+        //debug("Tick done");
+    }
+}
+//----------------------------------------------------------------------------------------------------------------------
+
+cv::Mat face_tracking_get_image_for_detection(face_tracking_state *s, gs_texture_t *source_tex, const uint2 &texrender_size) {
+    const gs_color_space source_space = GS_CS_SRGB;
+    const bool previous = gs_framebuffer_srgb_enabled();
+    gs_enable_framebuffer_srgb(true);
+
+    if (!s->staging_texture_detection || gs_stagesurface_get_width(s->staging_texture_detection) != texrender_size.x || gs_stagesurface_get_height(s->staging_texture_detection) != texrender_size.y) {
+        if (s->staging_texture_detection) {
+            gs_stagesurface_destroy(s->staging_texture_detection);
+        }
+        s->staging_texture_detection = gs_stagesurface_create(texrender_size.x, texrender_size.y, GS_RGBA32F);
+    }
+
+    gs_texrender_reset(s->facedetection_texrender);
+    if (gs_texrender_begin_with_color_space(s->facedetection_texrender, texrender_size.x, texrender_size.y, source_space)) {
+        const uint32_t cx = gs_texture_get_width(source_tex);
+        const uint32_t cy = gs_texture_get_height(source_tex);
+        gs_ortho(0.0f, (float)cx, 0.0f, (float)cy, -100.0f, 100.0f);
+        render_texture(source_tex, true, false);
+
+        gs_texrender_end(s->facedetection_texrender);
+
+        gs_texture_t *tex = gs_texrender_get_texture(s->facedetection_texrender);
+
+        gs_stage_texture(s->staging_texture_detection, tex);
+
+        //debug("%p ----> %p", s->staging_texture_detection, tex);
+
+        uint8_t *data;
+        uint32_t linesize;
+
+        if (gs_stagesurface_map(s->staging_texture_detection, &data, &linesize)) {
+            // Convert to BGR
+            cv::Mat imageRGBA((int)texrender_size.y, (int)texrender_size.x, CV_32FC4, data);
+            cv::Mat imageBGR = rgbaToBgrFloat(imageRGBA);
+
+            // Adjuting gamma
+            cv::pow(imageBGR, 1.0 / 2.2, imageBGR);
+
+            gs_stagesurface_unmap(s->staging_texture_detection);
+            gs_enable_framebuffer_srgb(previous);
+
+            return imageBGR;
+        }
+        else {
+            debug("cpt2");
+            gs_enable_framebuffer_srgb(previous);
+            return failed;
+        }
+    }
+    else {
+        debug("cpt");
+        gs_enable_framebuffer_srgb(previous);
+        return failed;
+    }
+}
+//----------------------------------------------------------------------------------------------------------------------
+
+cv::Mat face_tracking_get_image_for_mesh(face_tracking_state *s, gs_texture_t *source_tex, float2 &roi_center, float2 &roi_size, float rotation) {
+    return s->crop_shader->getCroppedImage(source_tex, roi_center, roi_size, rotation);
+}
+//----------------------------------------------------------------------------------------------------------------------
+
+void face_tracking_destroy(std::unique_ptr<face_tracking_state> &s) {
+    if (s != nullptr) {
+        obs_enter_graphics();
+        {
+            release_resource(gs_texrender_destroy, s->facedetection_texrender);
+            release_resource(gs_texture_destroy, s->fd_points_texture);
+            release_resource(gs_stagesurface_destroy, s->staging_texture_detection);
+        }
+        obs_leave_graphics();
+        s->crop_shader.reset(); // NOLINT(bugprone-unused-return-value)
+        s->facemesh.reset();
+        s.reset(); // NOLINT(bugprone-unused-return-value)
+    }
+}
+//----------------------------------------------------------------------------------------------------------------------

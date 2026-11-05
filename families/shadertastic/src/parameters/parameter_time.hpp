@@ -1,0 +1,153 @@
+/******************************************************************************
+    Copyright (C) 2025 by xurei <xureilab@gmail.com>
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 2 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+******************************************************************************/
+
+#ifndef SHADERTASTIC_PARAMETER_TIME_HPP
+#define SHADERTASTIC_PARAMETER_TIME_HPP
+
+#include <string>
+#include "parameter.hpp"
+
+namespace effect_parameter_time_detail {
+    using base_param = effect_parameter;
+
+    enum reset_type_t {
+        CHOICE_NO = 0,
+        CHOICE_YES = 1,
+        CHOICE_PROMPT = 2,
+    };
+}
+class effect_parameter_time : public effect_parameter_time_detail::base_param {
+    private:
+        static constexpr char PARAM_STR_SPEED[] = "speed";
+        static constexpr char PARAM_STR_RESET_ON_SHOW[] = "reset_on_show";
+
+        effect_parameter_time_detail::reset_type_t reset_on_show_type{effect_parameter_time_detail::CHOICE_NO};
+        bool reset_on_show{false};
+        bool default_reset_on_show{false};
+        bool show_speed_ui{true};
+        float *time;
+        float speed;
+        float min_speed;
+        float max_speed;
+        float default_speed;
+        std::string speed_label;
+
+    public:
+        explicit effect_parameter_time(gs_eparam_t *shader_param) : effect_parameter_time_detail::base_param(sizeof(float), shader_param), time((float*)this->data) {
+            *time = 0.0;
+        }
+
+        [[nodiscard]] effect_param_datatype type() const override {
+            return PARAM_DATATYPE_TIME;
+        }
+
+        void initialize_params(const std::string &effect_name, const effect_shader *shader, json_t *metadata, const std::string &effect_path) override {
+            UNUSED_PARAMETER(effect_name);
+            UNUSED_PARAMETER(shader);
+            UNUSED_PARAMETER(effect_path);
+
+            json_t *reset_on_show_obj = json_object_get(metadata, PARAM_STR_RESET_ON_SHOW);
+            if (json_is_object(reset_on_show_obj)) {
+                // TODO label ?
+                //json_t *label_json = json_object_get(reset_on_show_obj, "label");
+                json_t *default_json = json_object_get(reset_on_show_obj, "default");
+
+                reset_on_show_type = effect_parameter_time_detail::CHOICE_PROMPT;
+                default_reset_on_show = json_bool_value_or(default_json, false);
+            }
+            else if (json_is_string(reset_on_show_obj) && strcmp(json_string_value(reset_on_show_obj), "prompt") == 0) {
+                reset_on_show = false;
+                reset_on_show_type = effect_parameter_time_detail::CHOICE_PROMPT;
+            }
+            else {
+                reset_on_show = json_bool_value_or(reset_on_show_obj, false);
+                reset_on_show_type = reset_on_show ? effect_parameter_time_detail::CHOICE_YES : effect_parameter_time_detail::CHOICE_NO;
+            }
+
+            json_t *speed_obj = json_object_get(metadata, PARAM_STR_SPEED);
+            if (json_is_object(speed_obj)) {
+                json_t *show_ui_json = json_object_get(speed_obj, "show_ui");
+                json_t *label_json = json_object_get(speed_obj, "label");
+                json_t *min_json = json_object_get(speed_obj, "min");
+                json_t *max_json = json_object_get(speed_obj, "max");
+                json_t *default_json = json_object_get(speed_obj, "default");
+
+                min_speed = (float)json_number_value_or(min_json, 0.0);
+                max_speed = (float)json_number_value_or(max_json, 1.0);
+                default_speed = (float)json_number_value_or(default_json, 1.0);
+                show_speed_ui = json_is_boolean(show_ui_json) ? json_boolean_value(show_ui_json) : true;
+                speed_label = json_is_string(label_json) ? json_string_value(label_json) : "Speed";
+            }
+            else {
+                min_speed = 0.0f;
+                max_speed = 1.0f;
+                default_speed = 1.0f;
+                show_speed_ui = true;
+                speed_label = "Speed";
+            }
+
+            // Set time to zero at init time
+            *time = 0.0;
+        }
+
+        void set_default(obs_data_t *settings, const char *effect_name) override {
+            std::string full_param_name = get_full_param_name(effect_name);
+            obs_data_set_default_double(settings, get_full_subparam_name_static(full_param_name, PARAM_STR_SPEED).c_str(), default_speed);
+            obs_data_set_default_bool(settings, get_full_subparam_name_static(full_param_name, std::string(PARAM_STR_RESET_ON_SHOW)).c_str(), default_reset_on_show);
+        }
+
+        void render_property_ui(const char *effect_name, obs_properties_t *props) override {
+            std::string full_param_name = get_full_param_name(effect_name);
+            if (show_speed_ui) {
+                obs_properties_add_float_slider(props, get_full_subparam_name_static(full_param_name, PARAM_STR_SPEED).c_str(), speed_label.c_str(), min_speed, max_speed, 0.001);
+            }
+            if (reset_on_show_type == effect_parameter_time_detail::CHOICE_PROMPT) {
+                auto *ui_reset_prop = obs_properties_add_list(
+                    props, get_full_subparam_name_static(full_param_name, PARAM_STR_RESET_ON_SHOW).c_str(), "On filter visibility toggle:",
+                    OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_BOOL
+                );
+                obs_property_list_add_bool(ui_reset_prop, "Do nothing", false);
+                obs_property_list_add_bool(ui_reset_prop, "Reset time to zero", true);
+            }
+        }
+
+        void apply_visible(const char *effect_name, obs_properties_t *props, const bool visible) override {
+            std::string full_param_name = get_full_param_name(effect_name);
+            std::string speed_param_name = get_full_subparam_name_static(full_param_name, PARAM_STR_SPEED);
+            std::string reset_param_name = get_full_subparam_name_static(full_param_name, PARAM_STR_RESET_ON_SHOW);
+            auto *speed_prop = obs_properties_get(props, speed_param_name.c_str());
+            auto *reset_prop = obs_properties_get(props, reset_param_name.c_str());
+            if (speed_prop != nullptr) {
+                obs_property_set_visible(speed_prop, visible);
+            }
+            if (reset_prop != nullptr) {
+                obs_property_set_visible(reset_prop, visible);
+            }
+        }
+
+        void tick(shadertastic_common *s) override;
+
+        void set_data_from_settings(obs_data_t *settings, const char *effect_name) override {
+            std::string full_param_name = get_full_param_name(effect_name);
+            if (reset_on_show_type == effect_parameter_time_detail::CHOICE_PROMPT) {
+                reset_on_show = obs_data_get_bool(settings, get_full_subparam_name_static(full_param_name, PARAM_STR_RESET_ON_SHOW).c_str());
+            }
+            speed = (float)obs_data_get_double(settings, get_full_subparam_name_static(full_param_name, PARAM_STR_SPEED).c_str());
+        }
+};
+
+#endif // SHADERTASTIC_PARAMETER_TIME_HPP

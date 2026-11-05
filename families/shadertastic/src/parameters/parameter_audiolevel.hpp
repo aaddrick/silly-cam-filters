@@ -1,0 +1,183 @@
+/******************************************************************************
+    Copyright (C) 2023 by xurei <xureilab@gmail.com>
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 2 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+******************************************************************************/
+
+#ifndef SHADERTASTIC_PARAMETER_AUDIOLEVEL_HPP
+#define SHADERTASTIC_PARAMETER_AUDIOLEVEL_HPP
+
+#include <list>
+#include <string>
+#include "parameter.hpp"
+#include "../util/compare_nocase.hpp"
+#include "../util/time_util.hpp"
+
+namespace effect_parameter_audiolevel_detail {
+    using base_param = effect_parameter;
+
+    static bool add_source_to_list(void *data, obs_source_t *source) {
+        std::list<std::string> *sources_list = (std::list<std::string>*)(data);
+
+        uint32_t flags = obs_source_get_output_flags(source);
+        obs_source_type type = obs_source_get_type(source);
+
+        if ((flags & OBS_SOURCE_AUDIO) && ((type == OBS_SOURCE_TYPE_INPUT))) {
+            const char *name = obs_source_get_name(source);
+            if (name != nullptr) {
+                sources_list->push_back(std::string(name));
+            }
+        }
+        return true;
+    }
+}
+class effect_parameter_audiolevel : public effect_parameter_audiolevel_detail::base_param {
+    private:
+        obs_weak_source_t *source = nullptr;
+        obs_volmeter_t *obs_volmeter;
+        float smoothing = 0.5;
+        unsigned long last_callback_update = 0;
+
+    public:
+        explicit effect_parameter_audiolevel(gs_eparam_t *shader_param):
+            effect_parameter_audiolevel_detail::base_param(sizeof(float), shader_param),
+            obs_volmeter(obs_volmeter_create(OBS_FADER_LOG))
+        {
+            obs_volmeter_add_callback(this->obs_volmeter, effect_parameter_audiolevel::callback, this);
+            obs_volmeter_set_peak_meter_type(this->obs_volmeter, SAMPLE_PEAK_METER);
+            *((float*)this->data) = -100.0;
+        }
+
+        ~effect_parameter_audiolevel() override {
+            if (this->source != nullptr) {
+                obs_weak_source_release(this->source);
+                this->source = nullptr;
+            }
+            obs_volmeter_detach_source(obs_volmeter);
+            obs_volmeter_remove_callback(this->obs_volmeter, effect_parameter_audiolevel::callback, this);
+            obs_volmeter_destroy(this->obs_volmeter);
+        }
+
+        [[nodiscard]] effect_param_datatype type() const override {
+            return PARAM_DATATYPE_AUDIOLEVEL;
+        }
+
+        void initialize_params(const std::string &effect_name, const effect_shader *shader, json_t *metadata, const std::string &effect_path) override {
+            UNUSED_PARAMETER(effect_name);
+            UNUSED_PARAMETER(shader);
+            UNUSED_PARAMETER(metadata);
+            UNUSED_PARAMETER(effect_path);
+        }
+
+        void set_default(obs_data_t *settings, const char *effect_name) override {
+            std::string full_param_name = get_full_param_name(effect_name);
+            obs_data_set_default_double(settings, full_param_name.c_str(), 0.5);
+        }
+
+        void render_property_ui(const char *effect_name, obs_properties_t *props) override {
+            std::string full_param_name = get_full_param_name(effect_name);
+            std::string smoothing_param_name = full_param_name + "__smoothing";
+            auto *source_prop = obs_properties_add_list(props, full_param_name.c_str(), label.c_str(), OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_STRING);
+            std::list<std::string> sources_list;
+            obs_enum_sources(effect_parameter_audiolevel_detail::add_source_to_list, &sources_list);
+            sources_list.sort(compare_nocase);
+            for (const std::string &str: sources_list) {
+                obs_property_list_add_string(source_prop, str.c_str(), str.c_str());
+            }
+            auto smoothing_prop = obs_properties_add_float_slider(props, smoothing_param_name.c_str(), "∟ Smoothing", 0.0, 0.99, 0.01);
+            if (!description.empty()) {
+                obs_property_set_long_description(smoothing_prop, obs_module_text(description.c_str()));
+            }
+        }
+
+        void apply_visible(const char *effect_name, obs_properties_t *props, const bool visible) override {
+            std::string full_param_name = get_full_param_name(effect_name);
+            std::string smoothing_param_name = full_param_name + "__smoothing";
+            auto *source_prop = obs_properties_get(props, full_param_name.c_str());
+            auto *smoothing_prop = obs_properties_get(props, smoothing_param_name.c_str());
+            if (source_prop != nullptr) {
+                obs_property_set_visible(source_prop, visible);
+            }
+            if (smoothing_prop != nullptr) {
+                obs_property_set_visible(smoothing_prop, visible);
+            }
+        }
+
+        void set_data_from_settings(obs_data_t *settings, const char *effect_name) override {
+            std::string full_param_name = get_full_param_name(effect_name);
+            if (this->source != nullptr) {
+                this->hide();
+
+                obs_volmeter_detach_source(obs_volmeter);
+
+                // TODO release earlier ?
+                obs_weak_source_release(this->source);
+                this->source = nullptr;
+            }
+
+            obs_source_t *ref_source = obs_get_source_by_name(obs_data_get_string(settings, full_param_name.c_str()));
+            if (ref_source != nullptr) {
+                obs_volmeter_attach_source(obs_volmeter, ref_source);
+                this->source = obs_source_get_weak_source(ref_source);
+                this->show();
+                obs_source_release(ref_source);
+            }
+
+            this->smoothing = (float)obs_data_get_double(settings, (full_param_name + "__smoothing").c_str());
+        }
+
+        void try_gs_set_val() override {
+            unsigned long now = get_time_ms();
+
+            // If no callback has been received for more than 200ms, assume no sound
+            if (now - last_callback_update > 200) {
+                *((float*)this->data) = -100.0;
+            }
+
+            try_gs_effect_set_val(name.c_str(), shader_param, data, data_size);
+        }
+
+        static void callback(void *data,
+          const float magnitude[MAX_AUDIO_CHANNELS],
+          const float peak[MAX_AUDIO_CHANNELS],
+          const float inputPeak[MAX_AUDIO_CHANNELS]) {
+            UNUSED_PARAMETER(magnitude);
+            UNUSED_PARAMETER(peak);
+            UNUSED_PARAMETER(inputPeak);
+            effect_parameter_audiolevel *param = static_cast<effect_parameter_audiolevel *>(data);
+
+            float prev_val = *((float*)param->data);
+
+            float clamped_peak = magnitude[0];
+
+            if (clamped_peak < -100.0) {
+                clamped_peak = -100.0;
+            }
+            else if (clamped_peak > 0.0) {
+                clamped_peak = 0.0;
+            }
+
+            param->last_callback_update = get_time_ms();
+
+            //debug("AUDIO LEVEL CALLBACK %lu %f", get_time_ms(), clamped_peak);
+
+            float val = prev_val < clamped_peak ? clamped_peak : (float)(prev_val * param->smoothing + clamped_peak * (1.0 - param->smoothing));
+
+            *((float*)param->data) = (float) val;
+        }
+};
+
+
+
+#endif // SHADERTASTIC_PARAMETER_AUDIOLEVEL_HPP

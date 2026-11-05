@@ -1,0 +1,19 @@
+{
+    "dependencies": {},
+    "platformConfig": {
+        "macos": {
+            "bundleId": "com.aaddrick.silly-cam-filters"
+        }
+    },
+    "name": "silly-cam-filters",
+    "displayName": "Silly Cam Filters",
+    "version": "0.1.0",
+    "author": "aaddrick",
+    "website": "https://github.com/aaddrick/silly-cam-filters",
+    "email": "",
+    "uuids": {
+        "macosPackage": "00000000-0000-0000-0000-000000000000",
+        "macosInstaller": "00000000-0000-0000-0000-000000000000",
+        "windowsApp": "00000000-0000-0000-0000-000000000000"
+    }
+}

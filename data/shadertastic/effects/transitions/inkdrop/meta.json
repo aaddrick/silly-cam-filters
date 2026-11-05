@@ -1,0 +1,16 @@
+{
+  "about": {
+    "author_name": "xurei",
+    "author_url": "http://about.xurei.io"
+  },
+  "metafileVersion": 1,
+  "label": "Ink Drop",
+  "parameters": [
+    {
+      "name": "do_color_displace",
+      "label": "Color displacement",
+      "type": "bool",
+      "default": true
+    }
+  ]
+}
