@@ -19,6 +19,7 @@
 #include <vector>
 #include <list>
 #include <map>
+#include <algorithm>
 
 #include <obs-module.h>
 #include <obs-frontend-api.h>
@@ -43,6 +44,7 @@
 #include "util/time_util.hpp"
 #include "src/util/obs-retrocompat.hpp"
 #include "blueprints_library.h"
+#include "shader/shaderfilter_params.h"
 
 #include "shader_filter.h"
 #include "shader_transition.h"
@@ -133,6 +135,66 @@ void obs_module_frontend_saveload(obs_data_t *save_data, bool saving, void *data
         release_resource(obs_data_array_release, transi_backup_array);
     }
     obs_frontend_source_list_free(&transitions);
+}
+
+static void add_lazy_effect(shadertastic_common *s, const std::string &effect_name, const std::string &effect_path) {
+    if (s->effects->find(effect_name) != s->effects->end()) {
+        return; // the first folder wins
+    }
+    shadertastic_effect_blueprint_t *blueprint = nullptr;
+    if (blueprints_library.hasBlueprint("filter", effect_name)) {
+        blueprint = blueprints_library.getBlueprint("filter", effect_name);
+        if (blueprint->path != effect_path) {
+            return;
+        }
+    }
+    else {
+        blueprint = blueprints_library.loadBlueprint("filter", effect_name, effect_path);
+    }
+    if (blueprint == nullptr) {
+        return;
+    }
+    s->effects->insert(shadertastic_effects_map_t::value_type(effect_name, shadertastic_effect_t::from_blueprint(*blueprint)));
+}
+
+void load_effects_lazy(shadertastic_common *s, const std::string &folders_dir, const std::string &shaders_dir) {
+    // Folder effects (meta.json + main.hlsl)
+    for (const auto &dir : list_directories(folders_dir.c_str())) {
+        std::string effect_path = folders_dir + "/" + dir;
+        if (os_file_exists((effect_path + "/meta.json").c_str())) {
+            add_lazy_effect(s, dir, effect_path);
+        }
+    }
+    // Shadertastic bundles
+    std::string bundle_ext = ".filter.shadertastic";
+    for (const auto &zip : list_files(folders_dir.c_str(), bundle_ext)) {
+        std::string file = fs::path(zip).filename().string();
+        add_lazy_effect(s, file.substr(0, file.length() - bundle_ext.length()), zip);
+    }
+    // obs-shaderfilter files
+    for (std::string ext : {std::string(".shader"), std::string(".effect")}) {
+        for (const auto &file_path : list_files(shaders_dir.c_str(), ext)) {
+            auto text = load_file_zipped_or_local(file_path);
+            if (!text.has_value() || shaderfilter_is_transition_source(text.value())) {
+                continue; // transitions are not filters
+            }
+            std::string effect_name = fs::path(file_path).filename().string();
+            std::replace(effect_name.begin(), effect_name.end(), '.', '_');
+            add_lazy_effect(s, effect_name, file_path);
+        }
+    }
+}
+
+void engine_ensure_loaded(shadertastic_effect_t *effect, obs_data_t *settings) {
+    if (effect == nullptr) {
+        return;
+    }
+    if (!effect->loaded) {
+        effect->load();
+    }
+    if (settings != nullptr) {
+        shadertastic_effect_set_defaults(settings, effect);
+    }
 }
 
 void load_effects(shadertastic_common *s, obs_data_t *settings, const std::string &effects_dir, const std::string &effects_type) {
@@ -250,6 +312,12 @@ void load_effects(shadertastic_common *s, obs_data_t *settings, const std::strin
     shadertastic_filter_info.filter_add = shadertastic_filter_add_callback;
     shadertastic_filter_info.filter_remove = shadertastic_filter_remove_callback;
     obs_register_source(&shadertastic_filter_info);
+
+    // Silly Cam Filters engine: the same filter under its own ID and name.
+    struct obs_source_info silly_effect_info = shadertastic_filter_info;
+    silly_effect_info.id = SILLY_EFFECT_FILTER_NAME;
+    silly_effect_info.get_name = [](void *) -> const char * { return "Silly Effect"; };
+    obs_register_source(&silly_effect_info);
 
     QAction *action = static_cast<QAction *>(obs_frontend_add_tools_menu_qaction(obs_module_text("Shadertastic Settings")));
     QObject::connect(action, &QAction::triggered, show_settings_dialog);

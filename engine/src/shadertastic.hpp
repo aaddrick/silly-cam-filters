@@ -23,6 +23,11 @@
 //----------------------------------------------------------------------------------------------------------------------
 
 void load_effects(shadertastic_common *s, obs_data_t *settings, const std::string &effects_dir, const std::string &effects_type);
+
+// Silly Cam Filters engine: list folder effects and obs-shaderfilter files without compiling them.
+void load_effects_lazy(shadertastic_common *s, const std::string &folders_dir, const std::string &shaders_dir);
+// Compiles an effect on first use and sets its default settings.
+void engine_ensure_loaded(shadertastic_effect_t *effect, obs_data_t *settings);
 //----------------------------------------------------------------------------------------------------------------------
 
 const char *shadertastic_transition_get_name(void *type_data);

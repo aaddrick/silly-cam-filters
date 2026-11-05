@@ -19,7 +19,7 @@ void obs_module_set_pointer(obs_module_t *module)
 {
 	obs_module_pointer = module;
 	scf_shaderfilter_set_pointer(module);
-	scf_shadertastic_set_pointer(module);
+	scf_engine_set_pointer(module);
 	scf_retro_set_pointer(module);
 }
 
@@ -58,7 +58,7 @@ void obs_module_set_locale(const char *locale)
 	obs_module_lookup = obs_module_load_locale(obs_current_module(), "en-US", locale);
 
 	scf_shaderfilter_set_locale(locale);
-	scf_shadertastic_set_locale(locale);
+	scf_engine_set_locale(locale);
 	scf_retro_set_locale(locale);
 }
 
@@ -68,7 +68,7 @@ void obs_module_free_locale(void)
 	obs_module_lookup = NULL;
 
 	scf_shaderfilter_free_locale();
-	scf_shadertastic_free_locale();
+	scf_engine_free_locale();
 	scf_retro_free_locale();
 }
 
@@ -88,7 +88,7 @@ bool obs_module_load(void)
 
 	bool ok = true;
 	ok = scf_shaderfilter_load() && ok;
-	ok = scf_shadertastic_load() && ok;
+	ok = scf_engine_load() && ok;
 	ok = scf_retro_load() && ok;
 	scf_silly_register();
 
@@ -105,10 +105,10 @@ void obs_module_post_load(void)
 void obs_module_unload(void)
 {
 	scf_retro_unload();
-	scf_shadertastic_unload();
+	scf_engine_unload();
 	scf_shaderfilter_unload();
 
 	scf_shaderfilter_free_data_path();
-	scf_shadertastic_free_data_path();
+	scf_engine_free_data_path();
 	scf_retro_free_data_path();
 }

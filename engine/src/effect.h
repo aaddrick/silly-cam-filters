@@ -28,6 +28,28 @@
 #include "parameters/parameter_prev_frame.hpp"
 #include "src/shader/shaders_library.h"
 
+/**
+ * Silly Cam Filters engine: one render pass of an effect ("passes" in meta.json).
+ * See docs/ENGINE.md.
+ */
+struct effect_pass_def {
+    std::string name;
+    std::string technique = "Draw";
+    float scale = 1.0f;
+    int iterations = 1;
+    std::string iterations_param; // name of a parameter that sets the iteration count
+    gs_color_format format = GS_RGBA16;
+};
+
+/* Silly Cam Filters engine: GPU buffers of one pass, for one filter. */
+struct effect_pass_runtime {
+    gs_texrender_t *buf[2]{nullptr, nullptr};
+    int cur = 0;
+    gs_texrender_t *prev = nullptr; // copy of the output of the previous frame
+    bool keep_prev = false;
+    uint32_t width = 0, height = 0;
+};
+
 struct shadertastic_effect_blueprint_t {
     const std::string path;
     const std::string name;
@@ -35,6 +57,8 @@ struct shadertastic_effect_blueprint_t {
     int nb_steps{};
     bool legacy_input_time = false;
     bool legacy_input_facedetection = false;
+    shader_dialect dialect = shader_dialect::shadertastic;
+    std::vector<effect_pass_def> passes; // empty: one pass, or Shadertastic steps
 
     protected:
     friend struct shadertastic_effect_t;
@@ -55,6 +79,12 @@ struct shadertastic_effect_t : public shadertastic_effect_blueprint_t {
     std::unordered_map<std::string, std::list<effect_parameter *>> referenced_params;
     std::shared_ptr<effect_shader> main_shader{};
 
+    // Silly Cam Filters engine: GPU buffers for passes and previous frames.
+    std::vector<effect_pass_runtime> pass_runtime;
+    bool loaded = false;
+    [[nodiscard]] int pass_iterations(size_t pass_idx) const;
+    void release_gpu();
+
     [[nodiscard]] inline bool has_error() const {
         return shaders_library.has_error(this->path);
     }
@@ -73,6 +103,8 @@ struct shadertastic_effect_t : public shadertastic_effect_blueprint_t {
         out.metadata = blueprint.metadata;
         out.legacy_input_time = blueprint.legacy_input_time;
         out.legacy_input_facedetection = blueprint.legacy_input_facedetection;
+        out.dialect = blueprint.dialect;
+        out.passes = blueprint.passes;
         json_incref(out.metadata);
         return out;
     }

@@ -35,6 +35,7 @@
 #include "parameter_text.hpp"
 #include "parameter_time.hpp"
 #include "parameter_unknown.hpp"
+#include "parameter_vector.hpp"
 #include "parameter_factory.h"
 
 effect_parameter * effect_parameter_factory::create(const std::string &effect_name, const std::string &effect_path, const effect_shader *main_shader, json_t *param_metadata) {
@@ -110,6 +111,10 @@ effect_parameter * effect_parameter_factory::create(const std::string &effect_na
                 out = new effect_parameter_time(shader_param);
                 break;
             }
+            case PARAM_DATATYPE_VECTOR: {
+                out = new effect_parameter_vector(shader_param);
+                break;
+            }
             case PARAM_DATATYPE_GROUP: {
                 out = new effect_parameter_group(shader_param);
                 break;
@@ -161,6 +166,9 @@ effect_param_datatype effect_parameter_factory::effect_parse_datatype(const char
     }
     else if (strcmp(datatype_str, "time") == 0) {
         return PARAM_DATATYPE_TIME;
+    }
+    else if (strcmp(datatype_str, "vector") == 0) {
+        return PARAM_DATATYPE_VECTOR;
     }
     else if (strcmp(datatype_str, "group") == 0) {
         return PARAM_DATATYPE_GROUP;

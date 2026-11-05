@@ -54,6 +54,14 @@ class effect_parameter_color_alpha : public effect_parameter_color_alpha_detail:
 
     public:
         explicit effect_parameter_color_alpha(gs_eparam_t *shader_param) : effect_parameter_color_alpha_detail::base_param(sizeof(vec4), shader_param) {
+            // Silly Cam Filters engine: obs-shaderfilter colors can be float3.
+            if (shader_param != nullptr) {
+                gs_effect_param_info info{};
+                gs_effect_get_param_info(shader_param, &info);
+                if (info.type == GS_SHADER_PARAM_VEC3) {
+                    data_size = sizeof(float) * 3;
+                }
+            }
         }
 
         [[nodiscard]] effect_param_datatype type() const override {
@@ -89,7 +97,7 @@ class effect_parameter_color_alpha : public effect_parameter_color_alpha_detail:
         }
 
         void try_gs_set_val() override {
-            *((vec4*) this->data) = selected_color;
+            memcpy(this->data, &selected_color, data_size);
             if (gs_get_color_space() != GS_CS_SRGB) {
                 gs_float3_srgb_nonlinear_to_linear((float*) this->data);
             }

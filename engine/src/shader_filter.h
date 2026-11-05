@@ -19,6 +19,7 @@
 #define SHADERTASTIC_SHADER_FILTER_H
 
 #define SHADERTASTIC_FILTER_NAME "shadertastic_filter"
+#define SILLY_EFFECT_FILTER_NAME "silly_effect"
 
 #include <obs-module.h>
 #include "shadertastic_common.hpp"
@@ -34,6 +35,22 @@ struct shadertastic_filter : public shadertastic_common {
     uint32_t width{}, height{};
     bool should_reload = false;
     bool is_showing = false;
+
+    // Silly Cam Filters engine: built-in values (see docs/ENGINE.md)
+    float elapsed_time;
+    float effect_start_time;
+    float show_time;
+    float active_time;
+    float enable_time;
+    float loop_second;
+    int loops;
+    float rand_f;
+    float rand_instance_f;
+    float rand_activation_f;
+    bool engine_enabled;
+    gs_texrender_t *prev_image_texrender;   // source of the previous frame
+    gs_texrender_t *prev_output_texrender;  // output of the previous frame
+    gs_texrender_t *final_texrender;        // output of the current frame (weak)
 };
 //----------------------------------------------------------------------------------------------------------------------
 

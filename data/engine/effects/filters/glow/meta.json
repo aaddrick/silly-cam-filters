@@ -1,0 +1,17 @@
+{
+  "metafileVersion": 1,
+  "label": "Glow",
+  "about": { "author_name": "Silly Cam Filters" },
+  "parameters": [
+    { "name": "threshold", "label": "Brightness threshold", "type": "float", "slider": true, "min": 0.0, "max": 1.0, "step": 0.01, "default": 0.6 },
+    { "name": "strength", "label": "Glow strength", "type": "float", "slider": true, "min": 0.0, "max": 4.0, "step": 0.05, "default": 1.5 },
+    { "name": "radius", "label": "Glow size", "type": "float", "slider": true, "min": 0.5, "max": 8.0, "step": 0.1, "default": 2.0 },
+    { "name": "blur_passes", "label": "Smoothness", "type": "int", "slider": true, "min": 1, "max": 8, "step": 1, "default": 4 },
+    { "name": "tint", "label": "Glow color", "type": "color", "default": "#FFFFFFFF" }
+  ],
+  "passes": [
+    { "name": "bright", "technique": "Bright", "scale": 0.5 },
+    { "name": "blur", "technique": "Blur", "scale": 0.5, "iterations": "blur_passes" },
+    { "name": "result", "technique": "Combine" }
+  ]
+}

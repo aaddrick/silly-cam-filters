@@ -84,5 +84,5 @@ cleanup:
 
 /* One shim per family. The subfolder names match the folders in data/. */
 SCF_DEFINE_FAMILY_SHIM(shaderfilter, "shaderfilter")
-SCF_DEFINE_FAMILY_SHIM(shadertastic, "shadertastic")
+SCF_DEFINE_FAMILY_SHIM(engine, "engine")
 SCF_DEFINE_FAMILY_SHIM(retro, "retro-effects")

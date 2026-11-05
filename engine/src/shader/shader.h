@@ -19,11 +19,23 @@
 #define SHADERTASTIC_SHADER_H
 
 #include <string>
+#include <unordered_map>
 #include <obs-module.h>
+
+/**
+ * Silly Cam Filters engine: the source format of a shader.
+ * - shadertastic:       main.hlsl in an effect folder, with the Shadertastic header
+ * - shaderfilter_shader: an obs-shaderfilter .shader file, wrapped in its template
+ * - shaderfilter_effect: an obs-shaderfilter .effect file, used as it is
+ */
+enum class shader_dialect { shadertastic, shaderfilter_shader, shaderfilter_effect };
+
+shader_dialect shader_dialect_from_path(const std::string &path);
 
 class effect_shader {
     private:
     gs_effect_t *gs_effect = nullptr;
+    std::unordered_map<std::string, gs_eparam_t *> param_cache;
 
     public:
     // 0 -> 1 with transitions; time elapsed with filters when enabled
@@ -48,8 +60,21 @@ class effect_shader {
     gs_eparam_t *param_nb_steps = nullptr;
 
     std::string path{};
+    shader_dialect dialect = shader_dialect::shadertastic;
 
     ~effect_shader();
+
+    [[nodiscard]] inline gs_effect_t *get_gs_effect() const { return gs_effect; }
+
+    /* Built-in uniforms: set a value only if the shader declares the uniform. */
+    gs_eparam_t *find_param(const char *name);
+    void set_float_if(const char *name, float v);
+    void set_int_if(const char *name, int v);
+    void set_bool_if(const char *name, bool v);
+    void set_vec2_if(const char *name, float x, float y);
+    void set_vec3_if(const char *name, float x, float y, float z);
+    void set_texture_if(const char *name, gs_texture_t *tex, bool srgb);
+    bool has_param(const char *name) { return find_param(name) != nullptr; }
 
     std::string load(const char *shader_path);
 

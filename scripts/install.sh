@@ -53,6 +53,13 @@ done
 sudo rm -rf "$DATA_DIR/$NAME"
 sudo cmake --install "$ROOT/build"
 
+# Scene collections from obs-shaderfilter store full shader paths under
+# shaderfilter/examples/. The shaders now live in engine/shaders/, so keep the
+# old paths working with links.
+sudo mkdir -p "$DATA_DIR/$NAME/shaderfilter"
+sudo ln -sfn ../engine/shaders "$DATA_DIR/$NAME/shaderfilter/examples"
+sudo ln -sfn ../engine/shaders/textures "$DATA_DIR/$NAME/shaderfilter/textures"
+
 # CMake does not always rewrite the runpath; set it explicitly.
 sudo patchelf --set-rpath '$ORIGIN/'"$NAME" "$PLUGIN_DIR/$NAME.so"
 

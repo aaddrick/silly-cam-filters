@@ -15,6 +15,7 @@ enum effect_param_datatype {
     PARAM_DATATYPE_SOURCE,
     PARAM_DATATYPE_TEXT,
     PARAM_DATATYPE_TIME,
+    PARAM_DATATYPE_VECTOR, // Silly Cam Filters engine
     PARAM_DATATYPE_UNKNOWN,
 };
 

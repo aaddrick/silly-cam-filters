@@ -19,6 +19,7 @@
 #define SHADERTASTIC_PARAMETER_AUDIOLEVEL_HPP
 
 #include <list>
+#include <cmath>
 #include <string>
 #include "parameter.hpp"
 #include "../util/compare_nocase.hpp"
@@ -47,6 +48,7 @@ class effect_parameter_audiolevel : public effect_parameter_audiolevel_detail::b
         obs_weak_source_t *source = nullptr;
         obs_volmeter_t *obs_volmeter;
         float smoothing = 0.5;
+        bool linear = false; // Silly Cam Filters engine: send 0..1 in place of dB
         unsigned long last_callback_update = 0;
 
     public:
@@ -76,8 +78,9 @@ class effect_parameter_audiolevel : public effect_parameter_audiolevel_detail::b
         void initialize_params(const std::string &effect_name, const effect_shader *shader, json_t *metadata, const std::string &effect_path) override {
             UNUSED_PARAMETER(effect_name);
             UNUSED_PARAMETER(shader);
-            UNUSED_PARAMETER(metadata);
             UNUSED_PARAMETER(effect_path);
+            json_t *linear_json = json_object_get(metadata, "linear");
+            linear = json_is_boolean(linear_json) && json_boolean_value(linear_json);
         }
 
         void set_default(obs_data_t *settings, const char *effect_name) override {
@@ -145,6 +148,12 @@ class effect_parameter_audiolevel : public effect_parameter_audiolevel_detail::b
                 *((float*)this->data) = -100.0;
             }
 
+            if (linear) {
+                float db = *((float*)this->data);
+                float lin = db <= -100.0f ? 0.0f : powf(10.0f, db / 20.0f);
+                try_gs_effect_set_val(name.c_str(), shader_param, &lin, sizeof(float));
+                return;
+            }
             try_gs_effect_set_val(name.c_str(), shader_param, data, data_size);
         }
 

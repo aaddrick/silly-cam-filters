@@ -28,8 +28,67 @@
 #include "shader/shaders_library.h"
 #include "util/file_util.h"
 #include "settings.h"
+#include "shader/shaderfilter_params.h"
+
+static gs_color_format parse_pass_format(const char *f) {
+    if (f == nullptr) return GS_RGBA16;
+    if (strcmp(f, "rgba16f") == 0) return GS_RGBA16F;
+    if (strcmp(f, "rgba32f") == 0) return GS_RGBA32F;
+    if (strcmp(f, "rgba") == 0) return GS_RGBA;
+    return GS_RGBA16;
+}
+
+/* Silly Cam Filters engine: read "passes" from meta.json. */
+static std::vector<effect_pass_def> parse_passes(json_t *metadata, const std::string &effect_name) {
+    std::vector<effect_pass_def> out;
+    json_t *passes = json_object_get(metadata, "passes");
+    if (!json_is_array(passes)) {
+        return out;
+    }
+    for (size_t i = 0; i < json_array_size(passes); i++) {
+        json_t *p = json_array_get(passes, i);
+        if (!json_is_object(p)) continue;
+        effect_pass_def def;
+        json_t *name = json_object_get(p, "name");
+        if (!json_is_string(name)) {
+            warn("Effect %s: pass %zu has no name; skipping it", effect_name.c_str(), i);
+            continue;
+        }
+        def.name = json_string_value(name);
+        json_t *tech = json_object_get(p, "technique");
+        if (json_is_string(tech)) def.technique = json_string_value(tech);
+        json_t *scale = json_object_get(p, "scale");
+        if (json_is_number(scale)) def.scale = (float)json_number_value(scale);
+        if (def.scale <= 0.0f) def.scale = 1.0f;
+        json_t *iter = json_object_get(p, "iterations");
+        if (json_is_integer(iter)) def.iterations = (int)json_integer_value(iter);
+        else if (json_is_string(iter)) def.iterations_param = json_string_value(iter);
+        json_t *fmt = json_object_get(p, "format");
+        def.format = parse_pass_format(json_is_string(fmt) ? json_string_value(fmt) : nullptr);
+        out.push_back(def);
+    }
+    return out;
+}
+
+static std::string file_stem(const std::string &path) {
+    size_t slash = path.find_last_of("/\\");
+    std::string base = slash == std::string::npos ? path : path.substr(slash + 1);
+    size_t dot = base.find_last_of('.');
+    return dot == std::string::npos ? base : base.substr(0, dot);
+}
 
 void shadertastic_effect_blueprint_t::load_blueprint() {
+    dialect = shader_dialect_from_path(this->path);
+    if (dialect != shader_dialect::shadertastic) {
+        // Silly Cam Filters engine: an obs-shaderfilter file. The parameters
+        // come from the compiled shader, in shadertastic_effect_t::load().
+        label = file_stem(this->path);
+        nb_steps = 1;
+        metadata = json_object();
+        json_object_set_new(metadata, "label", json_string(label.c_str()));
+        json_object_set_new(metadata, "parameters", json_array());
+        return;
+    }
     std::string metadata_path = normalize_path(this->path + "/meta.json");
     debug(">>>>>>>>>>>>>>> load_effect %s %s %s", this->name.c_str(), this->path.c_str(), metadata_path.c_str());
 
@@ -76,6 +135,9 @@ void shadertastic_effect_blueprint_t::load_blueprint() {
         else {
             label = name;
         }
+
+        // Silly Cam Filters engine: passes
+        passes = parse_passes(metadata, name);
 
         // Steps
         json_t *steps_json = json_object_get(metadata, "steps");
@@ -130,6 +192,16 @@ void shadertastic_effect_t::load() {
     }
 
     json_incref(metadata);
+
+    // Silly Cam Filters engine: obs-shaderfilter files get their parameters
+    // from the uniforms of the compiled shader.
+    if (dialect != shader_dialect::shadertastic) {
+        this->main_shader = shaders_library.get(this->path);
+        if (this->main_shader != nullptr && this->main_shader->get_gs_effect() != nullptr) {
+            json_object_set_new(metadata, "parameters",
+                shaderfilter_build_parameters(this->main_shader->get_gs_effect(), this->path));
+        }
+    }
 
     // Parameters
     json_t *parameters = json_object_get(metadata, "parameters");
@@ -222,6 +294,7 @@ void shadertastic_effect_t::load() {
 
         //debug("Loaded effect %s from %s", name.c_str(), metadata_path.c_str());
     }
+    loaded = (this->main_shader != nullptr);
 }
 
 void shadertastic_effect_t::reload() {
@@ -348,7 +421,32 @@ void shadertastic_effect_t::hide() {
     }
 }
 
+int shadertastic_effect_t::pass_iterations(const size_t pass_idx) const {
+    const effect_pass_def &def = passes[pass_idx];
+    int n = def.iterations;
+    if (!def.iterations_param.empty()) {
+        effect_parameter *param = const_cast<params_list &>(effect_params).get(def.iterations_param);
+        if (param != nullptr && param->get_data() != nullptr) {
+            if (param->type() == PARAM_DATATYPE_DOUBLE) n = (int)*(float *)param->get_data();
+            else n = *(int *)param->get_data();
+        }
+    }
+    return n < 1 ? 1 : (n > 64 ? 64 : n);
+}
+
+void shadertastic_effect_t::release_gpu() {
+    obs_enter_graphics();
+    for (auto &rt : pass_runtime) {
+        release_resource(gs_texrender_destroy, rt.buf[0]);
+        release_resource(gs_texrender_destroy, rt.buf[1]);
+        release_resource(gs_texrender_destroy, rt.prev);
+    }
+    obs_leave_graphics();
+    pass_runtime.clear();
+}
+
 void shadertastic_effect_t::release() {
+    release_gpu();
     for (auto effect_param: effect_params) {
         delete effect_param;
     }

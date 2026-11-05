@@ -84,6 +84,10 @@ std::string shaders_library_t::get_error(const std::string &path) const {
 }
 
 std::string shaders_library_t::get_shader_path(const std::string &path) {
+    // Silly Cam Filters engine: obs-shaderfilter effects are single files.
+    if (shader_dialect_from_path(path) != shader_dialect::shadertastic) {
+        return path;
+    }
     return (path + "/main.hlsl");
 }
 

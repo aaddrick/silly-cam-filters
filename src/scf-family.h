@@ -66,12 +66,12 @@ const char *scf_data_path(obs_module_t *module, const char *subdir, char **cache
 	}
 
 SCF_DECLARE_FAMILY(shaderfilter)
-SCF_DECLARE_FAMILY(shadertastic)
+SCF_DECLARE_FAMILY(engine)
 SCF_DECLARE_FAMILY(retro)
 void scf_shaderfilter_post_load(void);
 
 void scf_shaderfilter_free_data_path(void);
-void scf_shadertastic_free_data_path(void);
+void scf_engine_free_data_path(void);
 void scf_retro_free_data_path(void);
 
 /* Our own filters (src/silly/). */

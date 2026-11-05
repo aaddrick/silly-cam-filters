@@ -87,7 +87,11 @@ class effect_parameter_image : public effect_parameter_image_detail::base_param 
 
             json_t *default_json = json_object_get(metadata, "default");
             const char *default_file = json_is_string(default_json) ? json_string_value(default_json) : "";
-            if (default_file[0] != '\0') {
+            if (default_file[0] == '/') {
+                // Silly Cam Filters engine: an absolute path (obs-shaderfilter textures)
+                default_value = default_file;
+            }
+            else if (default_file[0] != '\0') {
                 default_value = std::string("bundle://") + effect_path + '/' + default_file;
             }
             else {

@@ -27,6 +27,7 @@
 #include "util/texture_util.h"
 #include "util/time_util.hpp"
 #include "util/file_util.h"
+#include "engine_render.h"
 //----------------------------------------------------------------------------------------------------------------------
 
 static shadertastic_filter *shadertastic_no_filter = nullptr;
@@ -69,9 +70,14 @@ void *shadertastic_filter_create(obs_data_t *settings, obs_source_t *source) {
     s->interm_texrender[1] = gs_texrender_create(GS_RGBA16, GS_ZS_NONE);
     obs_leave_graphics();
 
-    std::string filters_dir = obs_module_file_std("effects");
+    engine_init_builtins(s);
 
-    load_effects(s, settings, filters_dir, "filter");
+    // Silly Cam Filters engine: the user's folder first, then the bundled effects.
+    // Effects are compiled only when selected (see engine_select_effect()).
+    std::string user_dir = obs_module_config_path_std("effects");
+    os_mkdirs(user_dir.c_str());
+    load_effects_lazy(s, user_dir, user_dir);
+    load_effects_lazy(s, obs_module_file_std("effects") + "/filters", obs_module_file_std("shaders"));
     auto effects_paths = shadertastic_settings().effects_paths;
     for (auto &effect_path : effects_paths) {
         load_effects(s, settings, effect_path, "filter");
@@ -123,6 +129,7 @@ void shadertastic_filter_destroy(void *data) {
     }
     obs_leave_graphics();
     release_resource(face_tracking_destroy, s->face_tracking);
+    engine_release_history(s);
     s->release();
     bfree(data);
 }
@@ -151,10 +158,16 @@ void shadertastic_filter_update(void *data, obs_data_t *settings) {
     const char *selected_effect_name = obs_data_get_string(settings, "effect");
     auto selected_effect_it = s->effects->find(selected_effect_name);
     if (selected_effect_it != s->effects->end()) {
-        if (s->selected_effect != nullptr && s->selected_effect != &(selected_effect_it->second)) {
+        shadertastic_effect_t *effect = &(selected_effect_it->second);
+        if (s->selected_effect != nullptr && s->selected_effect != effect) {
             s->selected_effect->hide();
         }
-        s->selected_effect = &(selected_effect_it->second);
+        if (s->selected_effect != effect) {
+            s->effect_start_time = s->elapsed_time;
+            engine_release_history(s);
+        }
+        engine_ensure_loaded(effect, settings);
+        s->selected_effect = effect;
     }
 
     if (s->selected_effect != nullptr) {
@@ -173,6 +186,8 @@ void shadertastic_filter_tick(void *data, float deltatime_seconds) {
     obs_source_t *target = obs_filter_get_target(s->source);
     s->width = obs_source_get_base_width(target);
     s->height = obs_source_get_base_height(target);
+
+    engine_tick_builtins(s, deltatime_seconds);
 
     bool is_enabled = obs_source_enabled(s->source) && s->selected_effect != nullptr;
 
@@ -240,7 +255,8 @@ void shadertastic_filter_video_render(void *data, gs_effect_t *effect_unused) {
     const uint32_t cy = s->height;
 
     if (!s->must_render) {
-        gs_texture_t *final_texture = gs_texrender_get_texture(s->interm_texrender[s->interm_texrender_buffer]);
+        gs_texrender_t *final_tr = s->final_texrender != nullptr ? s->final_texrender : s->interm_texrender[s->interm_texrender_buffer];
+        gs_texture_t *final_texture = gs_texrender_get_texture(final_tr);
         const bool prev_linear_srgb = gs_set_linear_srgb(true);
         render_texture(final_texture, false, false);
         gs_set_linear_srgb(prev_linear_srgb);
@@ -271,7 +287,18 @@ void shadertastic_filter_video_render(void *data, gs_effect_t *effect_unused) {
     constexpr vec4 clear_color{0,0,0,0};
 
     bool render_ok = true;
-    for (int current_step=0; current_step < selected_effect->nb_steps; ++current_step) {
+    bool keep_prev_image = false, keep_prev_output = false;
+    engine_needs_history(selected_effect->main_shader.get(), keep_prev_image, keep_prev_output);
+
+    if (!selected_effect->passes.empty()) {
+        // Silly Cam Filters engine: named render passes
+        effect_frame_params frame{s->frame_index, filter_time, s->delta_time, s->rand_seed};
+        gs_texrender_t *out = engine_render_passes(s, selected_effect, cx, cy, frame);
+        render_ok = (out != nullptr);
+        s->final_texrender = out;
+        interm_texture = out != nullptr ? gs_texrender_get_texture(out) : nullptr;
+    }
+    else for (int current_step=0; current_step < selected_effect->nb_steps; ++current_step) {
         s->interm_texrender_buffer = s->interm_texrender_buffer ^ 1;
         gs_texrender_reset(s->interm_texrender[s->interm_texrender_buffer]);
         bool texrender_ok = gs_texrender_begin_with_color_space(s->interm_texrender[s->interm_texrender_buffer], cx, cy, GS_CS_SRGB_16F);
@@ -287,11 +314,13 @@ void shadertastic_filter_video_render(void *data, gs_effect_t *effect_unused) {
         selected_effect->set_step_params(current_step, interm_texture);
         // You CANNOT put it above the for loop. Textures need to be rebinded every time (not that costful actually)
         selected_effect->set_params(nullptr, nullptr, s->frame_index, false, filter_time, s->delta_time, cx, cy, s->rand_seed);
+        engine_set_builtins(s, selected_effect->main_shader.get(), cx, cy);
 
         shadertastic_source_process_filter_tech_end(s->source, s->filter_texrender, selected_effect->main_shader.get(), cx, cy, "Draw");
 
         gs_texrender_end(s->interm_texrender[s->interm_texrender_buffer]);
         interm_texture = gs_texrender_get_texture(s->interm_texrender[s->interm_texrender_buffer]);
+        s->final_texrender = s->interm_texrender[s->interm_texrender_buffer];
 
         if (current_step < (int)selected_effect->prev_frames_to_keep.size() && selected_effect->prev_frames_to_keep[current_step]) {
             if (selected_effect->prev_frames_to_keep[current_step]->attach(cx, cy, source_space)) {
@@ -308,7 +337,15 @@ void shadertastic_filter_video_render(void *data, gs_effect_t *effect_unused) {
         }
     }
 
-    if (render_ok) {
+    // Silly Cam Filters engine: keep this frame for previous_image / previous_output.
+    if (keep_prev_image) {
+        engine_copy_texture(gs_texrender_get_texture(s->filter_texrender), &s->prev_image_texrender, cx, cy);
+    }
+    if (keep_prev_output && render_ok && interm_texture != nullptr) {
+        engine_copy_texture(interm_texture, &s->prev_output_texrender, cx, cy);
+    }
+
+    if (render_ok && interm_texture != nullptr) {
         render_texture(interm_texture, false, false);
     }
     else {
@@ -335,6 +372,12 @@ bool shadertastic_filter_properties_change_effect_callback(void *priv, obs_prope
     auto selected_effect_it = s->effects->find(std::string(select_effect_name));
     if (selected_effect_it != s->effects->end()) {
         debug("CALLBACK : %s -> %s", select_effect_name, selected_effect_it->second.name.c_str());
+        // Silly Cam Filters engine: compile the effect and add its settings on first use.
+        engine_ensure_loaded(&selected_effect_it->second, data);
+        if (obs_properties_get(props, (selected_effect_it->second.name + "__params").c_str()) == nullptr) {
+            selected_effect_it->second.create_properties(props);
+            selected_effect_it->second.attach_listeners(props);
+        }
         obs_property_set_visible(obs_properties_get(props, (selected_effect_it->second.name + "__params").c_str()), true);
 
         if (selected_effect_it->second.has_error()) {
@@ -411,6 +454,9 @@ obs_properties_t *shadertastic_filter_properties(void *data) {
     obs_property_set_modified_callback2(p, shadertastic_filter_properties_change_effect_callback, s);
 
     for (auto& [effect_name, effect] : *(s->effects)) {
+        if (!effect.loaded) {
+            continue; // Silly Cam Filters engine: settings are added when the effect is selected
+        }
         effect.create_properties(props);
         effect.attach_listeners(props);
     }
@@ -434,7 +480,9 @@ obs_properties_t *shadertastic_filter_properties(void *data) {
 void shadertastic_filter_get_defaults(obs_data_t *settings) {
     auto *tmp_filter = shadertastic_filter_cast(nullptr); // using cast to make sure the empty placeholder is created
     for (auto& [effect_name, effect] : *tmp_filter->effects) {
-        shadertastic_effect_set_defaults(settings, &effect);
+        if (effect.loaded) {
+            shadertastic_effect_set_defaults(settings, &effect);
+        }
     }
 }
 

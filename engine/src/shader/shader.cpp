@@ -24,6 +24,46 @@
 #include "../shadertastic.hpp"
 #include "src/util/hlsl_expander.hpp"
 #include "src/settings.h"
+#include "shaderfilter_template.h"
+#include "src/util/string_util.h"
+
+shader_dialect shader_dialect_from_path(const std::string &path) {
+    if (ends_with(path, ".shader")) {
+        return shader_dialect::shaderfilter_shader;
+    }
+    if (ends_with(path, ".effect")) {
+        return shader_dialect::shaderfilter_effect;
+    }
+    return shader_dialect::shadertastic;
+}
+
+static void replace_all(std::string &s, const std::string &from, const std::string &to) {
+    if (from.empty()) {
+        return;
+    }
+    size_t pos = 0;
+    while ((pos = s.find(from, pos)) != std::string::npos) {
+        s.replace(pos, from.length(), to);
+        pos += to.length();
+    }
+}
+
+/* Same preparation as obs-shaderfilter's shader_filter_reload_effect(). */
+static std::string wrap_shaderfilter_source(const std::string &text, const bool use_template) {
+    std::string out;
+    if (use_template) {
+        out += sf_effect_template_begin;
+    }
+    out += text;
+    if (use_template) {
+        out += sf_effect_template_end;
+    }
+    if (gs_get_device_type() == GS_DEVICE_OPENGL) {
+        replace_all(out, "[loop]", "");
+        out.insert(0, "#define OPENGL 1\n");
+    }
+    return out;
+}
 
 effect_shader::~effect_shader() {
     //debug("DELETE effect_shader %s", path.c_str());
@@ -40,8 +80,16 @@ std::string effect_shader::load(const char *shader_path) {
         return "File does not exist";
     }
     else {
+        dialect = shader_dialect_from_path(this->path);
+        std::string shader_source;
+        if (dialect != shader_dialect::shadertastic) {
+            obs_enter_graphics();
+            shader_source = wrap_shaderfilter_source(shader_source_.value(), dialect == shader_dialect::shaderfilter_shader);
+            obs_leave_graphics();
+        }
+        else {
         // Global common arguments, must be in all the effects for this plugin
-        std::string shader_source = (std::string("") +
+        shader_source = (std::string("") +
             "uniform float4x4 ViewProj;\n" +
             "uniform texture2d image;\n" +
             "uniform texture2d tex_a;\n" +
@@ -66,6 +114,7 @@ std::string effect_shader::load(const char *shader_path) {
             "#define facetracking_tex_edge(fd_points_tex, edge_idx) fd_points_tex.Sample(facetracking_sampler, float2(((edge_idx) + 0.5)/478.0, 1.0)).xyz \n" +
             shader_source_.value()
         );
+        }
         try {
             HLSLExpander expander;
             if (!shadertastic_settings().library_path.empty()) {
@@ -122,7 +171,51 @@ void effect_shader::render(const gs_texrender_t *texrender, const char *tech_nam
     gs_technique_end(tech);
 }
 
+gs_eparam_t *effect_shader::find_param(const char *name) {
+    if (gs_effect == nullptr) {
+        return nullptr;
+    }
+    auto it = param_cache.find(name);
+    if (it != param_cache.end()) {
+        return it->second;
+    }
+    gs_eparam_t *p = gs_effect_get_param_by_name(gs_effect, name);
+    param_cache.emplace(name, p);
+    return p;
+}
+
+void effect_shader::set_float_if(const char *name, const float v) {
+    if (auto *p = find_param(name)) gs_effect_set_float(p, v);
+}
+void effect_shader::set_int_if(const char *name, const int v) {
+    if (auto *p = find_param(name)) gs_effect_set_int(p, v);
+}
+void effect_shader::set_bool_if(const char *name, const bool v) {
+    if (auto *p = find_param(name)) gs_effect_set_bool(p, v);
+}
+void effect_shader::set_vec2_if(const char *name, const float x, const float y) {
+    if (auto *p = find_param(name)) {
+        vec2 v{};
+        vec2_set(&v, x, y);
+        gs_effect_set_vec2(p, &v);
+    }
+}
+void effect_shader::set_vec3_if(const char *name, const float x, const float y, const float z) {
+    if (auto *p = find_param(name)) {
+        vec3 v{};
+        vec3_set(&v, x, y, z);
+        gs_effect_set_vec3(p, &v);
+    }
+}
+void effect_shader::set_texture_if(const char *name, gs_texture_t *tex, const bool srgb) {
+    if (auto *p = find_param(name)) {
+        if (srgb) gs_effect_set_texture_srgb(p, tex);
+        else gs_effect_set_texture(p, tex);
+    }
+}
+
 void effect_shader::release() {
+    param_cache.clear();
     if (is_module_loaded() && gs_effect != nullptr) {
         debug("Release shader");
         obs_enter_graphics();

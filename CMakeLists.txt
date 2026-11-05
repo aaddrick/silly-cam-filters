@@ -80,14 +80,13 @@ scf_add_family(retro ${retro_SOURCES})
 set_property(SOURCE ${retro_SOURCES} TARGET_DIRECTORY ${CMAKE_PROJECT_NAME} APPEND PROPERTY COMPILE_DEFINITIONS
              create_or_reset_texrender=scf_retro_create_or_reset_texrender)
 
-# --- shadertastic (xurei/obs-shadertastic) ----------------------------------
-file(GLOB_RECURSE shadertastic_SOURCES CONFIGURE_DEPENDS "families/shadertastic/src/*.cpp")
+# --- engine (grew out of xurei/obs-shadertastic) ----------------------------
+file(GLOB_RECURSE shadertastic_SOURCES CONFIGURE_DEPENDS "engine/src/*.cpp")
 list(FILTER shadertastic_SOURCES EXCLUDE REGEX "win_dll_overrides\\.cpp$")
-file(GLOB onnxmediapipe_SOURCES CONFIGURE_DEPENDS "families/shadertastic/onnxmediapipe/src/*.cpp"
-     "families/shadertastic/onnxmediapipe/src/filtering/*.cpp")
-scf_add_family(shadertastic ${shadertastic_SOURCES} ${onnxmediapipe_SOURCES})
-target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE families/shadertastic
-                                                         families/shadertastic/onnxmediapipe/include)
+file(GLOB onnxmediapipe_SOURCES CONFIGURE_DEPENDS "engine/onnxmediapipe/src/*.cpp"
+     "engine/onnxmediapipe/src/filtering/*.cpp")
+scf_add_family(engine ${shadertastic_SOURCES} ${onnxmediapipe_SOURCES})
+target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE engine engine/onnxmediapipe/include)
 target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE DISABLE_ONNXRUNTIME_GPU)
 
 # ONNX Runtime (shared, installed next to the plugin) and OpenCV (static).
