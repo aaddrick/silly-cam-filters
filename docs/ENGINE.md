@@ -79,6 +79,7 @@ Each pass is one `technique` in `main.hlsl`. A single-pass effect uses `techniqu
 | `name` | The pass name. It must be a valid HLSL name and must not be a name from the header. | required |
 | `technique` | The technique in `main.hlsl` that draws this pass. | `Draw` |
 | `scale` | The size of the pass output, as a part of the source size. `0.5` is half width and half height. | `1.0` |
+| `size` | A fixed output size in pixels, `[width, height]`. Use `[1, 1]` for a pass that only stores state. It overrides `scale`. | none |
 | `iterations` | How many times the pass runs. A number, or the name of an `int` or `float` parameter. | `1` |
 | `format` | `rgba16` (default), `rgba16f` or `rgba32f`. Use `rgba32f` for simulations that store data in pixels. | `rgba16` |
 
@@ -90,7 +91,7 @@ The engine runs the passes in order. The output of the last pass is the output o
 |---|---|
 | `image` | the source |
 | `<pass>` | the output of an earlier pass in this frame. Inside an iterated pass, `<own name>` is the output of the previous iteration (on the first iteration, the output of the previous frame, or transparent). |
-| `<pass>_prev` | the output of that pass in the previous frame (any pass, also later ones and the pass itself). The engine keeps a copy only when an effect declares this uniform. |
+| `<pass>_prev` | the output of that pass in the previous frame (any pass, also later ones and the pass itself), in the pass's own format. The engine keeps a copy only when an effect declares this uniform. Before the first frame, it is transparent. |
 | `image_prev` | the source in the previous frame |
 
 **Values for each pass:**
@@ -104,6 +105,8 @@ The engine runs the passes in order. The output of the last pass is the output o
 | `iterations` | `int` | iteration count of this pass |
 
 Sample a pass texture with UVs from 0 to 1, like `image`. The pass size does not change the UVs.
+
+**Every pixel shader must use its input coordinate (`v_in.uv`).** On Linux (OpenGL), OBS draws nothing for a pass whose pixel shader ignores it: a pass that returns a constant, or that only reads a texture at a fixed point, leaves its output empty. In a `size: [1, 1]` state pass, `v_in.uv` is the pixel center `(0.5, 0.5)`, so read the state with `state.Sample(sampler, v_in.uv)`.
 
 ### Shadertastic steps
 

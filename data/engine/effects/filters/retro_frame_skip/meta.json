@@ -1,0 +1,11 @@
+{
+  "metafileVersion": 1,
+  "label": "Retro: Frame Skip",
+  "about": { "author_name": "FiniteSingularity (ported)", "author_url": "https://github.com/FiniteSingularity/obs-retro-effects" },
+  "parameters": [
+    { "name": "skip_frames", "label": "Frames To Skip", "type": "int", "slider": true, "min": 0, "max": 600, "step": 1, "default": 0 }
+  ],
+  "passes": [
+    { "name": "held", "technique": "Draw" }
+  ]
+}

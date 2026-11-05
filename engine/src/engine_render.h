@@ -15,7 +15,8 @@ void engine_init_builtins(shadertastic_filter *s);
 void engine_tick_builtins(shadertastic_filter *s, float seconds);
 void engine_set_builtins(shadertastic_filter *s, effect_shader *sh, uint32_t cx, uint32_t cy);
 bool engine_needs_history(effect_shader *sh, bool &prev_image, bool &prev_output);
-void engine_copy_texture(gs_texture_t *src, gs_texrender_t **dst, uint32_t cx, uint32_t cy);
+void engine_copy_texture(gs_texture_t *src, gs_texrender_t **dst, uint32_t cx, uint32_t cy,
+                         gs_color_format format = GS_RGBA16);
 void engine_release_history(shadertastic_filter *s);
 
 /* Renders all passes of an effect. Returns the texrender that holds the output, or nullptr. */

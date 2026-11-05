@@ -1,0 +1,39 @@
+{
+  "metafileVersion": 1,
+  "label": "Retro: Bloom",
+  "about": {
+    "author_name": "FiniteSingularity (ported)",
+    "author_url": "https://github.com/FiniteSingularity/obs-retro-effects",
+    "description": "Glow around bright areas, with a luminance, single-channel or custom channel-mix threshold. Port of the Bloom filter from obs-retro-effects 1.0.2."
+  },
+  "parameters": [
+    { "name": "bloom_intensity", "label": "Intensity", "type": "float", "slider": true, "min": 0.0, "max": 100.0, "step": 0.01, "default": 50.0 },
+    { "name": "bloom_size", "label": "Size", "type": "float", "slider": true, "min": 0.0, "max": 100.0, "step": 1.0, "default": 6.0 },
+    { "name": "bloom_threshold", "label": "Threshold", "type": "float", "slider": true, "min": 0.0, "max": 100.0, "step": 0.01, "default": 70.0 },
+    {
+      "name": "bloom_threshold_type", "label": "Threshold Type", "type": "list_int", "default": 0,
+      "values": [
+        { "value": 0, "label": "Luminance" },
+        { "value": 1, "label": "Red Channel" },
+        { "value": 2, "label": "Green Channel" },
+        { "value": 3, "label": "Blue Channel" },
+        { "value": 4, "label": "Custom Channel Mix" }
+      ]
+    },
+    {
+      "name": "bloom_levels_group", "label": "Threshold Levels", "type": "group",
+      "if": ["bloom_threshold_type", "==", 4],
+      "parameters": [
+        { "name": "bloom_red_level", "label": "Red", "type": "float", "slider": true, "min": -1.0, "max": 1.0, "step": 0.01, "default": 0.299 },
+        { "name": "bloom_green_level", "label": "Green", "type": "float", "slider": true, "min": -1.0, "max": 1.0, "step": 0.01, "default": 0.587 },
+        { "name": "bloom_blue_level", "label": "Blue", "type": "float", "slider": true, "min": -1.0, "max": 1.0, "step": 0.01, "default": 0.114 }
+      ]
+    }
+  ],
+  "passes": [
+    { "name": "bright", "technique": "Bright", "scale": 0.5 },
+    { "name": "blurh",  "technique": "BlurH",  "scale": 0.5 },
+    { "name": "blurv",  "technique": "BlurV",  "scale": 0.5 },
+    { "name": "result", "technique": "Combine" }
+  ]
+}

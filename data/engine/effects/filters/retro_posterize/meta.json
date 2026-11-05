@@ -1,0 +1,12 @@
+{
+  "metafileVersion": 1,
+  "label": "Retro: Posterize",
+  "about": { "author_name": "FiniteSingularity (ported)", "author_url": "https://github.com/FiniteSingularity/obs-retro-effects" },
+  "parameters": [
+    { "name": "posterize_levels", "label": "Levels", "type": "int", "min": 2, "max": 256, "step": 1, "default": 4 },
+    { "name": "posterize_technique", "label": "Color Handling", "type": "list_int", "values": [ { "value": 0, "label": "Passthrough Colors" }, { "value": 1, "label": "Map Colors" }, { "value": 2, "label": "Source Map Colors" } ], "default": 0 },
+    { "name": "posterize_map_source", "label": "Source", "type": "source", "if": ["posterize_technique", "==", 2] },
+    { "name": "posterize_color_1", "label": "Color 1", "type": "color", "default": "#FF000000", "if": ["posterize_technique", "==", 1] },
+    { "name": "posterize_color_2", "label": "Color 2", "type": "color", "default": "#FFFFFFFF", "if": ["posterize_technique", "==", 1] }
+  ]
+}

@@ -60,6 +60,11 @@ static std::vector<effect_pass_def> parse_passes(json_t *metadata, const std::st
         json_t *scale = json_object_get(p, "scale");
         if (json_is_number(scale)) def.scale = (float)json_number_value(scale);
         if (def.scale <= 0.0f) def.scale = 1.0f;
+        json_t *size = json_object_get(p, "size");
+        if (json_is_array(size) && json_array_size(size) == 2) {
+            def.width = (int)json_number_value(json_array_get(size, 0));
+            def.height = (int)json_number_value(json_array_get(size, 1));
+        }
         json_t *iter = json_object_get(p, "iterations");
         if (json_is_integer(iter)) def.iterations = (int)json_integer_value(iter);
         else if (json_is_string(iter)) def.iterations_param = json_string_value(iter);

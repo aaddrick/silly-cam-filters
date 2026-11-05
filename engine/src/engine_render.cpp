@@ -17,6 +17,8 @@
 #include "util/texture_util.h"
 #include "util/resource_util.hpp"
 
+extern gs_texture_t *shadertastic_transparent_texture;
+
 static float random01() {
     return (float)rand() / (float)RAND_MAX; // NOLINT(*-msc50-cpp)
 }
@@ -80,14 +82,12 @@ void engine_set_builtins(shadertastic_filter *s, effect_shader *sh, const uint32
     sh->set_vec3_if("iResolution", w, h, 1.0f);
     // History
     const bool srgb = texture_srgb();
-    if (s->prev_image_texrender != nullptr) {
-        gs_texture_t *t = gs_texrender_get_texture(s->prev_image_texrender);
+    {
+        gs_texture_t *t = s->prev_image_texrender != nullptr ? gs_texrender_get_texture(s->prev_image_texrender) : shadertastic_transparent_texture;
         sh->set_texture_if("previous_image", t, srgb);
         sh->set_texture_if("image_prev", t, srgb);
     }
-    if (s->prev_output_texrender != nullptr) {
-        sh->set_texture_if("previous_output", gs_texrender_get_texture(s->prev_output_texrender), srgb);
-    }
+    sh->set_texture_if("previous_output", s->prev_output_texrender != nullptr ? gs_texrender_get_texture(s->prev_output_texrender) : shadertastic_transparent_texture, srgb);
 }
 
 bool engine_needs_history(effect_shader *sh, bool &prev_image, bool &prev_output) {
@@ -96,12 +96,16 @@ bool engine_needs_history(effect_shader *sh, bool &prev_image, bool &prev_output
     return prev_image || prev_output;
 }
 
-void engine_copy_texture(gs_texture_t *src, gs_texrender_t **dst, const uint32_t cx, const uint32_t cy) {
+void engine_copy_texture(gs_texture_t *src, gs_texrender_t **dst, const uint32_t cx, const uint32_t cy, const gs_color_format format) {
     if (src == nullptr) {
         return;
     }
+    if (*dst != nullptr && gs_texrender_get_format(*dst) != format) {
+        gs_texrender_destroy(*dst);
+        *dst = nullptr;
+    }
     if (*dst == nullptr) {
-        *dst = gs_texrender_create(GS_RGBA16, GS_ZS_NONE);
+        *dst = gs_texrender_create(format, GS_ZS_NONE);
     }
     gs_texrender_reset(*dst);
     if (gs_texrender_begin_with_color_space(*dst, cx, cy, GS_CS_SRGB_16F)) {
@@ -118,6 +122,11 @@ void engine_release_history(shadertastic_filter *s) {
     release_resource(gs_texrender_destroy, s->prev_image_texrender);
     release_resource(gs_texrender_destroy, s->prev_output_texrender);
     obs_leave_graphics();
+}
+
+/* Float buffers are never sRGB-encoded on write, so they must not be decoded on read. */
+static bool is_float_format(const gs_color_format f) {
+    return f == GS_RGBA16F || f == GS_RGBA32F || f == GS_R16F || f == GS_R32F || f == GS_RG16F || f == GS_RG32F;
 }
 
 static gs_texrender_t *ensure_texrender(gs_texrender_t *&tr, const gs_color_format format) {
@@ -145,14 +154,13 @@ gs_texrender_t *engine_render_passes(shadertastic_filter *s, shadertastic_effect
         e->pass_runtime[i].keep_prev = sh->has_param((e->passes[i].name + "_prev").c_str());
     }
 
-    const bool srgb = texture_srgb();
     constexpr vec4 clear_color{0, 0, 0, 0};
 
     for (size_t i = 0; i < n; i++) {
         const effect_pass_def &def = e->passes[i];
         effect_pass_runtime &rt = e->pass_runtime[i];
-        const uint32_t w = std::max<uint32_t>(1, (uint32_t)std::lround(cx * def.scale));
-        const uint32_t h = std::max<uint32_t>(1, (uint32_t)std::lround(cy * def.scale));
+        const uint32_t w = def.width > 0 ? (uint32_t)def.width : std::max<uint32_t>(1, (uint32_t)std::lround(cx * def.scale));
+        const uint32_t h = def.height > 0 ? (uint32_t)def.height : std::max<uint32_t>(1, (uint32_t)std::lround(cy * def.scale));
         rt.width = w;
         rt.height = h;
         ensure_texrender(rt.buf[0], def.format);
@@ -167,6 +175,8 @@ gs_texrender_t *engine_render_passes(shadertastic_filter *s, shadertastic_effect
             }
             gs_clear(GS_CLEAR_COLOR, &clear_color, 0.0f, 0);
             gs_ortho(0.0f, (float)w, 0.0f, (float)h, -100.0f, 100.0f);
+            // Decide inside the render target, as Shadertastic does for its steps.
+            const bool srgb = texture_srgb();
 
             // Textures must be bound again for each draw.
             e->set_step_params((int)i, nullptr);
@@ -175,12 +185,16 @@ gs_texrender_t *engine_render_passes(shadertastic_filter *s, shadertastic_effect
 
             for (size_t j = 0; j < n; j++) {
                 const effect_pass_runtime &other = e->pass_runtime[j];
+                const bool pass_srgb = srgb && !is_float_format(e->passes[j].format);
                 if (j <= i && other.buf[other.cur] != nullptr) {
                     // Earlier passes: this frame's output. This pass: the previous iteration (or frame).
-                    sh->set_texture_if(e->passes[j].name.c_str(), gs_texrender_get_texture(other.buf[other.cur]), srgb);
+                    gs_texture_t *t = gs_texrender_get_texture(other.buf[other.cur]);
+                    sh->set_texture_if(e->passes[j].name.c_str(), t != nullptr ? t : shadertastic_transparent_texture, pass_srgb);
                 }
-                if (other.keep_prev && other.prev != nullptr) {
-                    sh->set_texture_if((e->passes[j].name + "_prev").c_str(), gs_texrender_get_texture(other.prev), srgb);
+                if (other.keep_prev) {
+                    // Before the first frame is kept, the shader sees a transparent texture.
+                    gs_texture_t *prev_tex = other.prev != nullptr ? gs_texrender_get_texture(other.prev) : shadertastic_transparent_texture;
+                    sh->set_texture_if((e->passes[j].name + "_prev").c_str(), prev_tex, pass_srgb);
                 }
             }
             sh->set_int_if("pass_index", (int)i);
@@ -199,7 +213,7 @@ gs_texrender_t *engine_render_passes(shadertastic_filter *s, shadertastic_effect
     for (size_t i = 0; i < n; i++) {
         effect_pass_runtime &rt = e->pass_runtime[i];
         if (rt.keep_prev) {
-            engine_copy_texture(gs_texrender_get_texture(rt.buf[rt.cur]), &rt.prev, rt.width, rt.height);
+            engine_copy_texture(gs_texrender_get_texture(rt.buf[rt.cur]), &rt.prev, rt.width, rt.height, e->passes[i].format);
         }
     }
 

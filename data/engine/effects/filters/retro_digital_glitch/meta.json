@@ -1,0 +1,38 @@
+{
+  "metafileVersion": 1,
+  "label": "Retro: Digital Glitch",
+  "about": {
+    "author_name": "FiniteSingularity (ported)",
+    "author_url": "https://github.com/FiniteSingularity/obs-retro-effects",
+    "description": "Digital Glitch filter from obs-retro-effects 1.0.2, ported to the Silly Cam Filters engine. The random block and color-drift bands are generated on the GPU."
+  },
+  "parameters": [
+    { "name": "digital_glitch_amount", "label": "Amount", "type": "float", "slider": true, "min": 0.0, "max": 100.0, "step": 0.1, "default": 50.0 },
+    {
+      "name": "digital_glitch_displacement", "label": "Displacement", "type": "group",
+      "parameters": [
+        { "name": "digital_glitch_max_disp", "label": "Max Displacement", "type": "float", "slider": true, "min": 0.0, "max": 8000.0, "step": 1.0, "default": 550.0 },
+        { "name": "digital_glitch_min_block_width", "label": "Min Block Width", "type": "int", "slider": true, "min": 0, "max": 4000, "step": 1, "default": 60 },
+        { "name": "digital_glitch_max_block_width", "label": "Max Block Width", "type": "int", "slider": true, "min": 0, "max": 4000, "step": 1, "default": 600 },
+        { "name": "digital_glitch_min_block_height", "label": "Min Block Height", "type": "int", "slider": true, "min": 0, "max": 4000, "step": 1, "default": 30 },
+        { "name": "digital_glitch_max_block_height", "label": "Max Block Height", "type": "int", "slider": true, "min": 0, "max": 4000, "step": 1, "default": 200 },
+        { "name": "digital_glitch_min_block_interval", "label": "Min Interval", "type": "float", "slider": true, "min": 0.0, "max": 4.0, "step": 0.01, "default": 0.1 },
+        { "name": "digital_glitch_max_block_interval", "label": "Max Interval", "type": "float", "slider": true, "min": 0.0, "max": 4.0, "step": 0.01, "default": 0.3 }
+      ]
+    },
+    {
+      "name": "digital_glitch_rgb_drift", "label": "Color Drift", "type": "group",
+      "parameters": [
+        { "name": "digital_glitch_max_rgb_drift", "label": "Max Drift Distance", "type": "float", "slider": true, "min": 0.0, "max": 8000.0, "step": 1.0, "default": 50.0 },
+        { "name": "digital_glitch_min_rgb_height", "label": "Min Height", "type": "int", "slider": true, "min": 0, "max": 4000, "step": 1, "default": 30 },
+        { "name": "digital_glitch_max_rgb_height", "label": "Max Height", "type": "int", "slider": true, "min": 0, "max": 4000, "step": 1, "default": 200 },
+        { "name": "digital_glitch_min_rgb_interval", "label": "Min Interval", "type": "float", "slider": true, "min": 0.0, "max": 4.0, "step": 0.01, "default": 0.1 },
+        { "name": "digital_glitch_max_rgb_interval", "label": "Max Interval", "type": "float", "slider": true, "min": 0.0, "max": 4.0, "step": 0.01, "default": 0.5 }
+      ]
+    }
+  ],
+  "passes": [
+    { "name": "glitch_clock", "technique": "Clock", "size": [1, 1], "format": "rgba32f" },
+    { "name": "glitch_out", "technique": "Glitch" }
+  ]
+}

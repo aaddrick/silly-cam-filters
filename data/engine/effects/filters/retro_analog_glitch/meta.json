@@ -1,0 +1,49 @@
+{
+  "metafileVersion": 1,
+  "label": "Retro: Analog Glitch",
+  "about": {
+    "author_name": "FiniteSingularity (ported)",
+    "author_url": "https://github.com/FiniteSingularity/obs-retro-effects",
+    "description": "Analog Glitch filter from obs-retro-effects 1.0.2 (based on 'Video Glitch' by dyvoid), ported to the Silly Cam Filters engine."
+  },
+  "parameters": [
+    { "name": "analog_glitch_max_disp", "label": "Max Displacement", "type": "float", "slider": true, "min": 0.0, "max": 6000.0, "step": 1.0, "default": 250.0 },
+    {
+      "name": "analog_glitch_primary", "label": "Primary Wave", "type": "group",
+      "parameters": [
+        { "name": "analog_glitch_primary_speed", "label": "Speed", "type": "float", "slider": true, "min": 0.0, "max": 100.0, "step": 0.01, "default": 2.0 },
+        { "name": "analog_glitch_primary_scale", "label": "Scale", "type": "float", "slider": true, "min": 0.0, "max": 1000.0, "step": 0.1, "default": 800.0 },
+        { "name": "analog_glitch_primary_threshold", "label": "Threshold", "type": "float", "slider": true, "min": 0.0, "max": 1.0, "step": 0.01, "default": 0.3 }
+      ]
+    },
+    {
+      "name": "analog_glitch_secondary", "label": "Secondary Wave", "type": "group",
+      "parameters": [
+        { "name": "analog_glitch_secondary_speed", "label": "Speed", "type": "float", "slider": true, "min": 0.0, "max": 100.0, "step": 0.01, "default": 5.0 },
+        { "name": "analog_glitch_secondary_scale", "label": "Scale", "type": "float", "slider": true, "min": 0.0, "max": 1000.0, "step": 0.1, "default": 128.0 },
+        { "name": "analog_glitch_secondary_threshold", "label": "Threshold", "type": "float", "slider": true, "min": 0.0, "max": 1.0, "step": 0.01, "default": 0.7 },
+        { "name": "analog_glitch_secondary_influence", "label": "Influence", "type": "float", "slider": true, "min": 0.0, "max": 1.0, "step": 0.01, "default": 0.15 }
+      ]
+    },
+    {
+      "name": "analog_glitch_interference", "label": "Interference", "type": "group",
+      "parameters": [
+        { "name": "analog_glitch_interference_magnitude", "label": "Interference Magnitude", "type": "float", "slider": true, "min": 0.0, "max": 1.0, "step": 0.01, "default": 0.3 },
+        { "name": "analog_glitch_line_magnitude", "label": "Line Magnitude", "type": "float", "slider": true, "min": 0.0, "max": 1.0, "step": 0.01, "default": 0.15 },
+        { "name": "analog_glitch_interfence_alpha", "label": "Alpha Channel?", "type": "bool", "default": false }
+      ]
+    },
+    {
+      "name": "analog_glitch_ca", "label": "Color Drift", "type": "group",
+      "parameters": [
+        { "name": "analog_glitch_ca_max_disp", "label": "Maximum Distance", "type": "float", "slider": true, "min": 0.0, "max": 250.0, "step": 1.0, "default": 0.0 }
+      ]
+    },
+    {
+      "name": "analog_glitch_desat", "label": "Desaturation", "type": "group",
+      "parameters": [
+        { "name": "analog_glitch_desat_amount", "label": "Amount", "type": "float", "slider": true, "min": 0.0, "max": 100.0, "step": 0.1, "default": 0.0 }
+      ]
+    }
+  ]
+}

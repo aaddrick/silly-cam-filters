@@ -1,0 +1,14 @@
+{
+  "metafileVersion": 1,
+  "label": "Retro: Chromatic Aberration",
+  "about": { "author_name": "FiniteSingularity (ported)", "author_url": "https://github.com/FiniteSingularity/obs-retro-effects" },
+  "parameters": [
+    { "name": "ca_type", "label": "Type", "type": "list_int", "values": [ { "value": 1, "label": "Manual" }, { "value": 2, "label": "Lens" } ], "default": 1 },
+    { "name": "ca_red_offset", "label": "Red Offset", "type": "float", "slider": true, "min": -500.0, "max": 500.0, "step": 0.1, "default": 3.0 },
+    { "name": "ca_red_offset_angle", "label": "Red Offset Angle", "type": "float", "slider": true, "min": -360.0, "max": 360.0, "step": 0.1, "default": 0.0, "if": ["ca_type", "==", 1] },
+    { "name": "ca_green_offset", "label": "Green Offset", "type": "float", "slider": true, "min": -500.0, "max": 500.0, "step": 0.1, "default": 0.0 },
+    { "name": "ca_green_offset_angle", "label": "Green Offset Angle", "type": "float", "slider": true, "min": -360.0, "max": 360.0, "step": 0.1, "default": 0.0, "if": ["ca_type", "==", 1] },
+    { "name": "ca_blue_offset", "label": "Blue Offset", "type": "float", "slider": true, "min": -500.0, "max": 500.0, "step": 0.1, "default": 3.0 },
+    { "name": "ca_blue_offset_angle", "label": "Blue Offset Angle", "type": "float", "slider": true, "min": -360.0, "max": 360.0, "step": 0.1, "default": 180.0, "if": ["ca_type", "==", 1] }
+  ]
+}

@@ -1,0 +1,50 @@
+{
+  "metafileVersion": 1,
+  "label": "Retro: VHS",
+  "about": {
+    "author_name": "FiniteSingularity (ported)",
+    "author_url": "https://github.com/FiniteSingularity/obs-retro-effects",
+    "description": "VHS tape playback: frame jitter, tape wrinkles, pop lines and head switching noise. Port of the VHS filter from obs-retro-effects 1.0.2."
+  },
+  "parameters": [
+    {
+      "name": "vhs_jitter_group", "label": "Frame Jitter", "type": "group",
+      "parameters": [
+        { "name": "vhs_jitter_min_size", "label": "Min Size", "type": "float", "slider": true, "min": 0.0, "max": 20.0, "step": 1.0, "default": 1.0 },
+        { "name": "vhs_jitter_max_size", "label": "Max Size", "type": "float", "slider": true, "min": 0.0, "max": 20.0, "step": 1.0, "default": 10.0 },
+        { "name": "vhs_jitter_min_period", "label": "Min Period", "type": "float", "slider": true, "min": 0.01, "max": 1.0, "step": 0.01, "default": 0.1 },
+        { "name": "vhs_jitter_max_period", "label": "Max Period", "type": "float", "slider": true, "min": 0.01, "max": 1.0, "step": 0.01, "default": 1.0 },
+        { "name": "vhs_jitter_min_interval", "label": "Min Interval", "type": "float", "slider": true, "min": 0.0, "max": 100.0, "step": 0.1, "default": 0.0 },
+        { "name": "vhs_jitter_max_interval", "label": "Max Interval", "type": "float", "slider": true, "min": 0.0, "max": 100.0, "step": 0.1, "default": 10.0 }
+      ]
+    },
+    {
+      "name": "vhs_wrinkle_group", "label": "Tape Wrinkle", "type": "group",
+      "parameters": [
+        { "name": "vhs_wrinkle_occurrence", "label": "Occurrence", "type": "float", "slider": true, "min": -20.0, "max": 120.0, "step": 0.1, "default": 10.0 },
+        { "name": "vhs_wrinkle_size", "label": "Size", "type": "float", "slider": true, "min": 0.0, "max": 20.0, "step": 0.1, "default": 5.0 },
+        { "name": "vhs_wrinkle_duration", "label": "Duration", "type": "float", "slider": true, "min": 0.1, "max": 20.0, "step": 0.1, "default": 3.0 }
+      ]
+    },
+    {
+      "name": "vhs_pop_lines_group", "label": "Pop Lines", "type": "group",
+      "parameters": [
+        { "name": "vhs_pop_lines_amount", "label": "Amount", "type": "float", "slider": true, "min": 0.0, "max": 100.0, "step": 0.1, "default": 10.0 }
+      ]
+    },
+    {
+      "name": "vhs_head_switching_group", "label": "Head Switching Noise", "type": "group",
+      "parameters": [
+        { "name": "vhs_head_switch_primary_thickness", "label": "Primary Thickness", "type": "float", "slider": true, "min": 0.0, "max": 100.0, "step": 1.0, "default": 15.0 },
+        { "name": "vhs_head_switch_primary_offset", "label": "Amount", "type": "float", "slider": true, "min": -100.0, "max": 100.0, "step": 1.0, "default": 30.0 },
+        { "name": "vhs_head_switch_secondary_thickness", "label": "Secondary Thickness", "type": "float", "slider": true, "min": 0.0, "max": 100.0, "step": 1.0, "default": 15.0 },
+        { "name": "vhs_head_switch_secondary_horiz_offset", "label": "Secondary Horiz Offset", "type": "float", "slider": true, "min": -100.0, "max": 100.0, "step": 1.0, "default": 30.0 },
+        { "name": "vhs_head_switch_secondary_vert_amount", "label": "Secondary Amount", "type": "float", "slider": true, "min": 0.0, "max": 10.0, "step": 0.1, "default": 5.0 }
+      ]
+    }
+  ],
+  "passes": [
+    { "name": "state",  "technique": "State", "size": [1, 1], "format": "rgba32f" },
+    { "name": "result", "technique": "Draw" }
+  ]
+}

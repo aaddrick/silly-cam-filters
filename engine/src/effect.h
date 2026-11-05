@@ -36,6 +36,7 @@ struct effect_pass_def {
     std::string name;
     std::string technique = "Draw";
     float scale = 1.0f;
+    int width = 0, height = 0; // fixed size in pixels ("size": [w, h]); 0 = use scale
     int iterations = 1;
     std::string iterations_param; // name of a parameter that sets the iteration count
     gs_color_format format = GS_RGBA16;

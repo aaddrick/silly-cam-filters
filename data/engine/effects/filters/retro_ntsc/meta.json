@@ -1,0 +1,41 @@
+{
+  "metafileVersion": 1,
+  "label": "Retro: NTSC",
+  "about": {
+    "author_name": "FiniteSingularity (ported)",
+    "author_url": "https://github.com/FiniteSingularity/obs-retro-effects",
+    "description": "Analog NTSC TV signal: tuning error and vertical roll, luma noise and banding, chroma bleed. Port of the NTSC filter from obs-retro-effects 1.0.2."
+  },
+  "parameters": [
+    { "name": "ntsc_tuning_offset", "label": "Tuning Offset", "type": "float", "slider": true, "min": -1000.0, "max": 1000.0, "step": 0.1, "default": 1.0 },
+    {
+      "name": "ntsc_luma_settings", "label": "Luma Settings", "type": "group",
+      "parameters": [
+        { "name": "ntsc_luma_noise", "label": "Noise", "type": "float", "slider": true, "min": 0.0, "max": 100.0, "step": 0.1, "default": 0.0 },
+        { "name": "ntsc_luma_band_size", "label": "Band Size", "type": "float", "slider": true, "min": 0.0, "max": 100.0, "step": 0.1, "default": 10.0 },
+        { "name": "ntsc_luma_band_strength", "label": "Band Strength", "type": "float", "slider": true, "min": 0.0, "max": 400.0, "step": 0.1, "default": 70.0 },
+        { "name": "ntsc_luma_band_count", "label": "Band Count", "type": "int", "slider": true, "min": 1, "max": 8, "step": 1, "default": 1 }
+      ]
+    },
+    {
+      "name": "ntsc_chroma_settings", "label": "Chroma Settings", "type": "group",
+      "parameters": [
+        { "name": "ntsc_chroma_bleed_size", "label": "Bleed Size", "type": "float", "slider": true, "min": 0.0, "max": 100.0, "step": 0.1, "default": 50.0 },
+        { "name": "ntsc_chroma_bleed_steps", "label": "Bleed Steps", "type": "int", "slider": true, "min": 1, "max": 30, "step": 1, "default": 15 },
+        { "name": "ntsc_chroma_bleed_strength", "label": "Bleed Strength", "type": "float", "slider": true, "min": 0.0, "max": 100.0, "step": 0.1, "default": 70.0 }
+      ]
+    },
+    {
+      "name": "ntsc_picture", "label": "Picture Adjustment", "type": "group",
+      "parameters": [
+        { "name": "ntsc_brightness", "label": "Brightness", "type": "float", "slider": true, "min": 0.0, "max": 200.0, "step": 0.1, "default": 100.0 },
+        { "name": "ntsc_saturation", "label": "Saturation", "type": "float", "slider": true, "min": 0.0, "max": 200.0, "step": 0.1, "default": 100.0 }
+      ]
+    }
+  ],
+  "passes": [
+    { "name": "state",  "technique": "State", "size": [1, 1], "format": "rgba32f" },
+    { "name": "encode", "technique": "Encode" },
+    { "name": "decode", "technique": "Decode" }
+  ]
+}

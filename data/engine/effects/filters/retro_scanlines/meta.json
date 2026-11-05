@@ -1,0 +1,11 @@
+{
+  "metafileVersion": 1,
+  "label": "Retro: Scanlines",
+  "about": { "author_name": "FiniteSingularity (ported)", "author_url": "https://github.com/FiniteSingularity/obs-retro-effects" },
+  "parameters": [
+    { "name": "scanlines_profile", "label": "Profile", "type": "list_int", "values": [ { "value": 0, "label": "Sin Wave" }, { "value": 1, "label": "Square" }, { "value": 2, "label": "Saw-Tooth" }, { "value": 3, "label": "Smooth Step" }, { "value": 4, "label": "Triangular" } ], "default": 0 },
+    { "name": "scanlines_period", "label": "Period", "type": "float", "slider": true, "min": 2.0, "max": 2000.0, "step": 1.0, "default": 30.0 },
+    { "name": "scanlines_speed", "label": "Speed", "type": "float", "slider": true, "min": -2000.0, "max": 2000.0, "step": 1.0, "default": 50.0 },
+    { "name": "scanlines_intensity", "label": "Intensity", "type": "float", "slider": true, "min": 0.0, "max": 200.0, "step": 0.1, "default": 0.0 }
+  ]
+}
