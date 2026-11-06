@@ -1,0 +1,87 @@
+{
+  "metafileVersion": 1,
+  "label": "[Face Tracking] Face Censor",
+  "about": {
+    "author_name": "Silly Cam Filters",
+    "author_url": ""
+  },
+  "parameters": [
+    {
+      "type": "facetracking",
+      "name": "fd",
+      "use_preraster": true,
+      "reset_on_face_lost": true
+    },
+    {
+      "name": "fail_closed_note",
+      "label": "",
+      "type": "text",
+      "value": "When no face is found, the whole picture is censored, so a face is never shown by mistake."
+    },
+    {
+      "name": "style",
+      "label": "Style",
+      "type": "list_int",
+      "default": 0,
+      "values": [
+        {
+          "value": 0,
+          "label": "Pixelate"
+        },
+        {
+          "value": 1,
+          "label": "Blur"
+        }
+      ]
+    },
+    {
+      "name": "block",
+      "label": "Block size",
+      "type": "float",
+      "slider": true,
+      "min": 0.05,
+      "max": 0.3,
+      "default": 0.11,
+      "step": 0.01,
+      "description": "Pixel block (or blur) size, as a fraction of the face width."
+    },
+    {
+      "name": "margin",
+      "label": "Margin",
+      "type": "float",
+      "slider": true,
+      "min": 0.0,
+      "max": 0.8,
+      "default": 0.25,
+      "step": 0.01,
+      "description": "Extra censored area around the face, as a fraction of the face size."
+    }
+  ],
+  "passes": [
+    {
+      "name": "track",
+      "technique": "Track",
+      "size": [
+        1,
+        1
+      ],
+      "format": "rgba32f"
+    },
+    {
+      "name": "blurh",
+      "technique": "BlurH",
+      "scale": 0.25,
+      "format": "rgba16f"
+    },
+    {
+      "name": "blurv",
+      "technique": "BlurV",
+      "scale": 0.25,
+      "format": "rgba16f"
+    },
+    {
+      "name": "out",
+      "technique": "Draw"
+    }
+  ]
+}
