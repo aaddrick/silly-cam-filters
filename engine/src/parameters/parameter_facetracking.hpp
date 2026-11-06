@@ -61,6 +61,14 @@ class effect_parameter_facetracking : public effect_parameter_facetracking_detai
         uint32_t cx{0};
         uint32_t cy{0};
 
+        // Silly Cam Filters engine: preraster cache (see try_gs_set_val)
+        static inline uint64_t preraster_global_generation{0};
+        gs_texture_t *preraster_cache{};
+        uint64_t preraster_generation{0};
+        uint64_t preraster_frame_time{0};
+        uint32_t preraster_cx{0};
+        uint32_t preraster_cy{0};
+
         // Silly Cam Filters engine: a comma was missing here, so the "no face"
         // box was (-1,-2),(-1,0) instead of (-1,-1),(-1,-1).
         static constexpr face_tracking_bounding_box no_bounding_box{
@@ -182,7 +190,19 @@ class effect_parameter_facetracking : public effect_parameter_facetracking_detai
 
                 //Pre-raster texture
                 if (use_preraster) {
-                    auto *fd_preraster_texture = FaceTrackingRaster::mesh_uv_gpu(face_tracking->average_results.refined_landmarks, onnxmediapipe::face_triangles, (int)cx, (int)cy);
+                    // Silly Cam Filters engine: this runs once per pass and per iteration, so
+                    // rasterise the face mesh once per frame. The raster target is shared by all
+                    // filters, so the cache is valid only while nobody rasterised since.
+                    const uint64_t frame_time = obs_get_video_frame_time();
+                    if (preraster_cache == nullptr || preraster_frame_time != frame_time || preraster_cx != cx ||
+                        preraster_cy != cy || preraster_generation != preraster_global_generation) {
+                        preraster_cache = FaceTrackingRaster::mesh_uv_gpu(face_tracking->average_results.refined_landmarks, onnxmediapipe::face_triangles, (int)cx, (int)cy);
+                        preraster_generation = ++preraster_global_generation;
+                        preraster_frame_time = frame_time;
+                        preraster_cx = cx;
+                        preraster_cy = cy;
+                    }
+                    auto *fd_preraster_texture = preraster_cache;
                     try_gs_effect_set_texture(points_tex.c_str(), param_fd_preraster_tex, fd_preraster_texture);
                 }
             }
