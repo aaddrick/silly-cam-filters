@@ -1,0 +1,127 @@
+{
+  "metafileVersion": 1,
+  "label": "Reaction-Diffusion Skin",
+  "about": {
+    "author_name": "Silly Cam Filters",
+    "description": "A Gray-Scott chemical pattern grows from the edges of your picture, like coral or animal markings, and drapes over you."
+  },
+  "parameters": [
+    {
+      "name": "preset",
+      "label": "Pattern",
+      "type": "list_int",
+      "default": 0,
+      "values": [
+        {
+          "value": 0,
+          "label": "Coral"
+        },
+        {
+          "value": 1,
+          "label": "Spots"
+        },
+        {
+          "value": 2,
+          "label": "Maze"
+        },
+        {
+          "value": 3,
+          "label": "Cell division"
+        }
+      ]
+    },
+    {
+      "name": "rd_iterations",
+      "label": "Growth speed",
+      "type": "int",
+      "slider": true,
+      "min": 1,
+      "max": 16,
+      "step": 1,
+      "default": 6
+    },
+    {
+      "name": "seed_edges",
+      "label": "Seed from edges",
+      "type": "float",
+      "slider": true,
+      "min": 0.0,
+      "max": 1.0,
+      "step": 0.01,
+      "default": 0.5
+    },
+    {
+      "name": "follow",
+      "label": "Follow the picture's light",
+      "type": "float",
+      "slider": true,
+      "min": 0.0,
+      "max": 1.0,
+      "step": 0.01,
+      "default": 0.4
+    },
+    {
+      "name": "mix_amount",
+      "label": "Mix",
+      "type": "float",
+      "slider": true,
+      "min": 0.0,
+      "max": 1.0,
+      "step": 0.01,
+      "default": 0.5
+    },
+    {
+      "name": "pattern_color",
+      "label": "Pattern color",
+      "type": "color",
+      "default": "#FFFF8C3A"
+    },
+    {
+      "name": "restart_seconds",
+      "label": "Restart every (seconds at 30 fps, 0 = never)",
+      "type": "float",
+      "slider": true,
+      "min": 0.0,
+      "max": 120.0,
+      "step": 1.0,
+      "default": 0.0
+    },
+    {
+      "name": "reset",
+      "label": "Reset (hold on, then off)",
+      "type": "bool",
+      "default": false
+    },
+    {
+      "name": "show_chemical",
+      "label": "Show only the pattern",
+      "type": "bool",
+      "default": false
+    }
+  ],
+  "passes": [
+    {
+      "name": "meanl",
+      "technique": "Mean",
+      "size": [
+        1,
+        1
+      ],
+      "format": "rgba32f"
+    },
+    {
+      "name": "rd",
+      "technique": "Step",
+      "size": [
+        384,
+        216
+      ],
+      "format": "rgba32f",
+      "iterations": "rd_iterations"
+    },
+    {
+      "name": "out",
+      "technique": "Draw"
+    }
+  ]
+}
