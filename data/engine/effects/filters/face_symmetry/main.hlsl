@@ -1,7 +1,7 @@
 // Perfect Symmetry: one half of the face is replaced by the mirror image of the other half, mirrored across the
 // eye-corner midline (the perpendicular bisector of the two eye sockets, so it follows roll and does not move with gaze).
 // The mirror maps the midline onto itself, so the seam is continuous; "blend" softens it further. The effect covers the
-// face oval (landmarks 10/152/234/454) and feathers out between 1.05 and 1.3 oval radii.
+// face oval (landmarks 10/152/234/454) and feathers out between 1.0 and 1.15 oval radii, fading above the brows.
 // track (3x1 rgba32f): 0 = (eyes mid.xy UV, roll, socket distance ISO), 1 = (oval centre.xy, half size.xy) face-local,
 //                      2 = (presence, 0, 0, 1). Kept while the face is lost, so the effect fades out in place.
 @include "silly_face.hlsl"
@@ -67,7 +67,13 @@ float4 PSDraw(VertData v_in) : TARGET {
     float2 l = sf_rotate(sf_to_iso(v_in.uv) - mid_iso, -t0.z) / t0.w;     // face-local, x = 0 on the midline
     float2 h = max(t1.zw, float2(0.05, 0.05));
     float d = length((l - t1.xy) / h);
-    float region = 1.0 - smoothstep(1.05, 1.3, d);
+    // fix r2 (D9 ghosts): feather just outside the oval (1.0-1.15 radii, was 1.05-1.3), so little mirrored hair, ear or background lands outside the
+    // face, and fade the mirror out above the brows (face-local y < -0.45 eye distances), where hair and partings
+    // make a mirrored forehead look smeared.
+    // Above the eyes, the replaced side's temple also stays original (|x| > 0.5..0.9 eye distances, above y -0.2..-0.4): with the head turned a
+    // little, the far temple's hair and shadow would otherwise be mirrored onto the near forehead (the side=right ghost).
+    float temple = (1.0 - smoothstep(-0.4, -0.2, l.y)) * smoothstep(0.5, 0.9, abs(l.x));
+    float region = (1.0 - smoothstep(1.0, 1.15, d)) * smoothstep(-0.85, -0.45, l.y) * (1.0 - temple);
     if (region <= 0.0) {
         return src;
     }
