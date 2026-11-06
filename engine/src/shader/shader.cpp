@@ -120,8 +120,21 @@ std::string effect_shader::load(const char *shader_path) {
             if (!shadertastic_settings().library_path.empty()) {
                 expander.addPath(shadertastic_settings().library_path);
             }
+            // Silly Cam Filters engine: shared include folders (see docs/ENGINE.md),
+            // the user's folder first, then the one that ships with the plugin.
+            expander.addPath(obs_module_config_path_std("include"));
+            if (char *shipped_include = obs_module_file("include")) {
+                expander.addPath(std::string(shipped_include));
+                bfree(shipped_include);
+            }
             fs::path fs_path(shader_path);
-            shader_source = expander.expand_includes(shader_source, fs_path.parent_path().c_str(), load_file_local);
+            // Silly Cam Filters engine: log each included file, so a stale copy that
+            // shadows a shared include is visible in the OBS log.
+            auto load_include = [shader_path](const std::string &include_path) {
+                info("%s: @include %s", shader_path, include_path.c_str());
+                return load_file_local(include_path);
+            };
+            shader_source = expander.expand_includes(shader_source, fs_path.parent_path().c_str(), load_include);
         }
         catch (std::runtime_error &e) {
             log_error("Could not parse shader file %s :\n%s", shader_path, e.what());
