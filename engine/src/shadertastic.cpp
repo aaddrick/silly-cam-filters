@@ -45,6 +45,7 @@
 #include "src/util/obs-retrocompat.hpp"
 #include "blueprints_library.h"
 #include "shader/shaderfilter_params.h"
+#include "legacy_compat.h"
 
 #include "shader_filter.h"
 #include "shader_transition.h"
@@ -155,6 +156,10 @@ static void add_lazy_effect(shadertastic_common *s, const std::string &effect_na
         return;
     }
     s->effects->insert(shadertastic_effects_map_t::value_type(effect_name, shadertastic_effect_t::from_blueprint(*blueprint)));
+}
+
+void engine_add_effect_file(shadertastic_common *s, const std::string &effect_name, const std::string &effect_path) {
+    add_lazy_effect(s, effect_name, effect_path);
 }
 
 void load_effects_lazy(shadertastic_common *s, const std::string &folders_dir, const std::string &shaders_dir) {
@@ -318,6 +323,16 @@ void load_effects(shadertastic_common *s, obs_data_t *settings, const std::strin
     silly_effect_info.id = SILLY_EFFECT_FILTER_NAME;
     silly_effect_info.get_name = [](void *) -> const char * { return "Silly Effect"; };
     obs_register_source(&silly_effect_info);
+
+    // Hidden aliases: filters saved by obs-shaderfilter and obs-retro-effects open in the engine.
+    struct obs_source_info legacy_shader_info = silly_effect_info;
+    legacy_shader_info.id = LEGACY_SHADER_FILTER_ID;
+    legacy_shader_info.output_flags |= OBS_SOURCE_DEPRECATED;
+    obs_register_source(&legacy_shader_info);
+    struct obs_source_info legacy_retro_info = silly_effect_info;
+    legacy_retro_info.id = LEGACY_RETRO_FILTER_ID;
+    legacy_retro_info.output_flags |= OBS_SOURCE_DEPRECATED;
+    obs_register_source(&legacy_retro_info);
 
     QAction *action = static_cast<QAction *>(obs_frontend_add_tools_menu_qaction(obs_module_text("Shadertastic Settings")));
     QObject::connect(action, &QAction::triggered, show_settings_dialog);

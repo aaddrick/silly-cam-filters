@@ -36,6 +36,7 @@ class effect_shader {
     private:
     gs_effect_t *gs_effect = nullptr;
     std::unordered_map<std::string, gs_eparam_t *> param_cache;
+    gs_vertbuffer_t *sprite_buffer = nullptr; // a quad in pixel units (see render())
 
     public:
     // 0 -> 1 with transitions; time elapsed with filters when enabled

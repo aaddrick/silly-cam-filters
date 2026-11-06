@@ -27,7 +27,9 @@
 #include "util/texture_util.h"
 #include "util/time_util.hpp"
 #include "util/file_util.h"
+#include <util/platform.h>
 #include "engine_render.h"
+#include "legacy_compat.h"
 //----------------------------------------------------------------------------------------------------------------------
 
 static shadertastic_filter *shadertastic_no_filter = nullptr;
@@ -47,6 +49,11 @@ static inline shadertastic_filter* shadertastic_filter_cast(void *data) {
 //----------------------------------------------------------------------------------------------------------------------
 
 void *shadertastic_filter_create(obs_data_t *settings, obs_source_t *source) {
+    // Silly Cam Filters engine: filters saved by obs-shaderfilter or obs-retro-effects.
+    if (source != nullptr) {
+        engine_convert_legacy_settings(obs_source_get_id(source), settings);
+    }
+
     shadertastic_filter *s = static_cast<shadertastic_filter*>(bzalloc(sizeof(struct shadertastic_filter)));
     s->source = source;
     s->effects = new shadertastic_effects_map_t();
@@ -81,6 +88,13 @@ void *shadertastic_filter_create(obs_data_t *settings, obs_source_t *source) {
     auto effects_paths = shadertastic_settings().effects_paths;
     for (auto &effect_path : effects_paths) {
         load_effects(s, settings, effect_path, "filter");
+    }
+    // A shader file outside the effect folders (for example from obs-shaderfilter).
+    const char *effect_file = obs_data_get_string(settings, "effect_file");
+    const char *effect_name = obs_data_get_string(settings, "effect");
+    if (effect_file != nullptr && effect_file[0] != '\0' && s->effects->find(effect_name) == s->effects->end() &&
+        os_file_exists(effect_file)) {
+        engine_add_effect_file(s, effect_name, effect_file);
     }
 
     // Set defaults for each effect

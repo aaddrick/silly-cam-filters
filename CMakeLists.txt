@@ -70,16 +70,6 @@ function(scf_add_family family)
   target_sources(${CMAKE_PROJECT_NAME} PRIVATE ${ARGN})
 endfunction()
 
-# --- shaderfilter (exeldro/obs-shaderfilter) -------------------------------
-scf_add_family(shaderfilter families/shaderfilter/obs-shaderfilter.c)
-
-# --- retro (FiniteSingularity/obs-retro-effects) ----------------------------
-file(GLOB_RECURSE retro_SOURCES CONFIGURE_DEPENDS "families/retro-effects/*.c")
-scf_add_family(retro ${retro_SOURCES})
-# Both shaderfilter and retro define this helper; give retro its own copy.
-set_property(SOURCE ${retro_SOURCES} TARGET_DIRECTORY ${CMAKE_PROJECT_NAME} APPEND PROPERTY COMPILE_DEFINITIONS
-             create_or_reset_texrender=scf_retro_create_or_reset_texrender)
-
 # --- engine (grew out of xurei/obs-shadertastic) ----------------------------
 file(GLOB_RECURSE shadertastic_SOURCES CONFIGURE_DEPENDS "engine/src/*.cpp")
 list(FILTER shadertastic_SOURCES EXCLUDE REGEX "win_dll_overrides\\.cpp$")

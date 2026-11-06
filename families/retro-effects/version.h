@@ -1,6 +1,0 @@
-#pragma once
-/* silly-cam-filters: fixed upstream version of this family */
-#define PROJECT_VERSION "1.0.2"
-#define PROJECT_VERSION_MAJOR 1
-#define PROJECT_VERSION_MINOR 0
-#define PROJECT_VERSION_PATCH 2

@@ -14,9 +14,9 @@ The engine looks in these folders, in this order. When two effects have the same
 
 | Folder | Contents |
 |---|---|
-| `~/.config/obs-studio/plugin_config/silly-cam-filters/effects/` | your own effects (folders and shader files) |
-| `<plugin data>/effects/` | effects that ship with the plugin |
-| `<plugin data>/shaders/` | single-file shaders from obs-shaderfilter |
+| `~/.config/obs-studio/plugin_config/silly-cam-filters/engine/effects/` | your own effects (folders and shader files) |
+| `<plugin data>/engine/effects/filters/` | folder effects that ship with the plugin |
+| `<plugin data>/engine/shaders/` | single-file shaders from obs-shaderfilter |
 
 An effect is one of these:
 

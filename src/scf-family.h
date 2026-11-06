@@ -3,10 +3,10 @@
  * "families" of filters that came from separate upstream plugins.
  *
  * Each family is compiled with its OBS module hooks renamed
- * (see scf_add_family() in CMakeLists.txt). For example, the family
- * "retro" has its obs_module_load() compiled as scf_retro_load(), and its
- * calls to obs_module_file("x") go to scf_retro_find_module_file(), which
- * looks in <data>/retro-effects/x instead of <data>/x.
+ * (see scf_add_family() in CMakeLists.txt). The effect engine is the one
+ * family: its obs_module_load() is compiled as scf_engine_load(), and its
+ * calls to obs_module_file("x") go to scf_engine_find_module_file(), which
+ * looks in <data>/engine/x instead of <data>/x.
  *
  * This file declares the renamed hooks so that plugin.c can call them,
  * and the shim functions that send each family to its own data folder.
@@ -65,14 +65,9 @@ const char *scf_data_path(obs_module_t *module, const char *subdir, char **cache
 		scf_##F##_data_path_cache = NULL;                                                         \
 	}
 
-SCF_DECLARE_FAMILY(shaderfilter)
 SCF_DECLARE_FAMILY(engine)
-SCF_DECLARE_FAMILY(retro)
-void scf_shaderfilter_post_load(void);
 
-void scf_shaderfilter_free_data_path(void);
 void scf_engine_free_data_path(void);
-void scf_retro_free_data_path(void);
 
 /* Our own filters (src/silly/). */
 void scf_silly_register(void);

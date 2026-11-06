@@ -162,10 +162,41 @@ void effect_shader::render(const gs_texrender_t *texrender, const char *tech_nam
     auto *tech = get_technique(tech_name);
     auto *texture = texrender != nullptr ? gs_texrender_get_texture(texrender) : nullptr;
 
+    UNUSED_PARAMETER(texture);
+
+    // Silly Cam Filters engine: draw a quad whose corners are in pixels, as
+    // obs-shaderfilter does. gs_draw_sprite() draws a unit quad and scales it
+    // with the view matrix, so a vertex shader that moves corners by pixel
+    // amounts (for example obs-shaderfilter's shake.effect) would break.
+    if (sprite_buffer == nullptr) {
+        gs_vb_data *vbd = gs_vbdata_create();
+        vbd->num = 4;
+        vbd->points = static_cast<vec3 *>(bzalloc(sizeof(vec3) * 4));
+        vbd->num_tex = 1;
+        vbd->tvarray = static_cast<gs_tvertarray *>(bzalloc(sizeof(gs_tvertarray)));
+        vbd->tvarray[0].width = 2;
+        vbd->tvarray[0].array = bzalloc(sizeof(vec2) * 4);
+        sprite_buffer = gs_vertexbuffer_create(vbd, GS_DYNAMIC);
+    }
+    gs_vb_data *data = gs_vertexbuffer_get_data(sprite_buffer);
+    auto *uv = static_cast<vec2 *>(data->tvarray[0].array);
+    const float fcx = (float)cx, fcy = (float)cy;
+    vec3_zero(data->points);
+    vec3_set(data->points + 1, fcx, 0.0f, 0.0f);
+    vec3_set(data->points + 2, 0.0f, fcy, 0.0f);
+    vec3_set(data->points + 3, fcx, fcy, 0.0f);
+    vec2_set(uv, 0.0f, 0.0f);
+    vec2_set(uv + 1, 1.0f, 0.0f);
+    vec2_set(uv + 2, 0.0f, 1.0f);
+    vec2_set(uv + 3, 1.0f, 1.0f);
+    gs_vertexbuffer_flush(sprite_buffer);
+
     const size_t passes = gs_technique_begin(tech);
     for (size_t i = 0; i < passes; i++) {
         gs_technique_begin_pass(tech, i);
-        gs_draw_sprite(texture, 0, cx, cy);
+        gs_load_vertexbuffer(sprite_buffer);
+        gs_load_indexbuffer(nullptr);
+        gs_draw(GS_TRISTRIP, 0, 0);
         gs_technique_end_pass(tech);
     }
     gs_technique_end(tech);
@@ -216,11 +247,12 @@ void effect_shader::set_texture_if(const char *name, gs_texture_t *tex, const bo
 
 void effect_shader::release() {
     param_cache.clear();
-    if (is_module_loaded() && gs_effect != nullptr) {
+    if (is_module_loaded() && (gs_effect != nullptr || sprite_buffer != nullptr)) {
         debug("Release shader");
         obs_enter_graphics();
         {
             release_resource(gs_effect_destroy, gs_effect);
+            release_resource(gs_vertexbuffer_destroy, sprite_buffer);
         }
         obs_leave_graphics();
     }
