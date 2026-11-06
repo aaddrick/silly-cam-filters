@@ -57,6 +57,9 @@ float4 PSTrack(VertData v_in) : TARGET {
     return fresh ? cur : sm;
 }
 
+// The mouth shown at each eye is stretched vertically (cartoon "mouth eyes": lips and teeth read as a mouth, not a slit).
+#define FM_EYE_STRETCH_INV 0.6
+
 // weight of a target ellipse at local point l, and the source point it shows (uniform scale k about the source centre)
 float patch_w(float2 l, float2 c, float2 semi) {
     float d = length((l - c) / semi);
@@ -78,11 +81,13 @@ float4 PSDraw(VertData v_in) : TARGET {
     float eye_hw = clamp(t1.w, 0.12, 0.35);
 
     // targets: eye spots (eye + lids) and the mouth spot (lips)
-    float2 eye_semi = float2(1.6, 1.05) * eye_hw * patch_size;
-    float2 mouth_semi = float2(1.3, 0.8) * mouth_hw * patch_size;
+    // fix r2 (D36, cartoon not uncanny): rounder, taller eye spots that show the WHOLE lips (source half height
+    // ~0.95 mouth half widths, not a teeth slit), and a mouth spot 1.4x bigger so the eyes on the mouth read.
+    float2 eye_semi = float2(1.7, 1.2) * eye_hw * patch_size;
+    float2 mouth_semi = float2(1.82, 1.12) * mouth_hw * patch_size;
     // sources: the mouth (for the eyes) and the eye band with brows (for the mouth), uniformly scaled to fit
-    float k_eye = (1.3 * mouth_hw) / (1.6 * eye_hw);             // source/target scale for an eye spot
-    float k_mouth = (0.5 + 1.6 * eye_hw) / (1.3 * mouth_hw);     // eye band half width / mouth spot half width
+    float k_eye = (1.35 * mouth_hw) / (1.7 * eye_hw);            // source/target scale for an eye spot
+    float k_mouth = (0.5 + 1.6 * eye_hw) / (1.82 * mouth_hw);    // eye band half width / mouth spot half width
 
     float2 el = float2(-0.5, 0.0);
     float2 er = float2(0.5, 0.0);
@@ -93,10 +98,10 @@ float4 PSDraw(VertData v_in) : TARGET {
     float2 ls = l;
     float w = 0.0;
     if (wl > 0.0) {
-        ls = mouth_c + (l - el) * k_eye;
+        ls = mouth_c + (l - el) * k_eye * float2(1.0, FM_EYE_STRETCH_INV);
         w = wl;
     } else if (wr > 0.0) {
-        ls = mouth_c + (l - er) * k_eye;
+        ls = mouth_c + (l - er) * k_eye * float2(1.0, FM_EYE_STRETCH_INV);
         w = wr;
     } else if (wm > 0.0) {
         // centre the eye band slightly above the socket line so the brows come along
