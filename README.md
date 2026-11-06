@@ -38,6 +38,7 @@ Add the **Silly Effect** filter to a source or scene, and pick an effect from th
 | Shadertastic effects (laser eyes, face melt, face zoom, ghost, recursion, shake, ...) | 14 | effect folders, some with face tracking |
 | Retro Effects (CRT, VHS, NTSC, matrix rain, digital and analog glitch, dither, ...) | 15 | multi-pass effect folders |
 | Glow | 1 | multi-pass example |
+| Color Correction | 1 | port of OBS's built-in Color Correction filter, same settings |
 
 The plugin also opens filters saved by the original plugins. `shader_filter` (obs-shaderfilter), `obs_retro_effects_filter` (Retro Effects) and `shadertastic_filter` (Shadertastic) are hidden aliases of Silly Effect. Their settings are converted when OBS loads them.
 

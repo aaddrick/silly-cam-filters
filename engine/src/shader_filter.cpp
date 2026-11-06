@@ -169,6 +169,12 @@ void shadertastic_filter_update(void *data, obs_data_t *settings) {
         obs_source_update_properties(s->source);
     }
 
+    // Silly Cam Filters engine: OBS calls this from the graphics thread (deferred update)
+    // and from the scene-loading thread (the .load callback). engine_ensure_loaded() can
+    // rebuild an effect's parameter list, so hold the graphics lock here. Rendering holds
+    // it too, so loading, updating and rendering an effect never overlap.
+    obs_enter_graphics();
+
     const char *selected_effect_name = obs_data_get_string(settings, "effect");
     auto selected_effect_it = s->effects->find(selected_effect_name);
     if (selected_effect_it != s->effects->end()) {
@@ -191,6 +197,8 @@ void shadertastic_filter_update(void *data, obs_data_t *settings) {
             param->set_data_from_settings(settings, selected_effect_name);
         }
     }
+
+    obs_leave_graphics();
 }
 //----------------------------------------------------------------------------------------------------------------------
 
@@ -387,11 +395,14 @@ bool shadertastic_filter_properties_change_effect_callback(void *priv, obs_prope
     if (selected_effect_it != s->effects->end()) {
         debug("CALLBACK : %s -> %s", select_effect_name, selected_effect_it->second.name.c_str());
         // Silly Cam Filters engine: compile the effect and add its settings on first use.
+        // This runs on the UI thread; see shadertastic_filter_update() for the lock.
+        obs_enter_graphics();
         engine_ensure_loaded(&selected_effect_it->second, data);
         if (obs_properties_get(props, (selected_effect_it->second.name + "__params").c_str()) == nullptr) {
             selected_effect_it->second.create_properties(props);
             selected_effect_it->second.attach_listeners(props);
         }
+        obs_leave_graphics();
         obs_property_set_visible(obs_properties_get(props, (selected_effect_it->second.name + "__params").c_str()), true);
 
         if (selected_effect_it->second.has_error()) {
@@ -422,7 +433,9 @@ bool shadertastic_filter_reload_button_click(obs_properties_t *props, obs_proper
     shadertastic_filter *s = shadertastic_filter_cast(data);
 
     if (s->selected_effect != nullptr) {
+        obs_enter_graphics();
         s->selected_effect->reload();
+        obs_leave_graphics();
     }
     s->should_reload = true;
     s->rand_seed = (float)rand() / (float)RAND_MAX;
@@ -517,7 +530,9 @@ void shadertastic_filter_show(void *data) {
         s->is_showing = true;
         shadertastic_effect_t *selected_effect = s->selected_effect;
         if (selected_effect != nullptr) {
+            obs_enter_graphics();
             selected_effect->show();
+            obs_leave_graphics();
         }
     }
 }
@@ -529,7 +544,9 @@ void shadertastic_filter_hide(void *data) {
         s->is_showing = false;
         shadertastic_effect_t *selected_effect = s->selected_effect;
         if (selected_effect != nullptr) {
+            obs_enter_graphics();
             selected_effect->hide();
+            obs_leave_graphics();
         }
     }
 }
