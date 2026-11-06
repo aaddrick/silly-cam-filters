@@ -4,7 +4,7 @@
   "about": { "author_name": "Silly Cam Filters", "description": "When you get loud, random tiles of the picture freeze for a moment while the rest keeps moving. Quiet = normal picture." },
   "parameters": [
     { "name": "audio_level", "label": "Audio Source", "type": "audiolevel" },
-    { "name": "audio_threshold", "label": "Loudness threshold (dB)", "type": "float", "slider": true, "min": -80.0, "max": 0.0, "step": 0.5, "default": -20.0 },
+    { "name": "audio_threshold", "label": "Loudness threshold (dB)", "type": "float", "slider": true, "min": -80.0, "max": 0.0, "step": 0.5, "default": -30.0 },
     { "name": "tile_size", "label": "Tile size (pixels)", "type": "float", "slider": true, "min": 16.0, "max": 400.0, "step": 4.0, "default": 120.0 },
     { "name": "freeze_time", "label": "Freeze time (seconds)", "type": "float", "slider": true, "min": 0.1, "max": 3.0, "step": 0.05, "default": 0.8 },
     { "name": "amount", "label": "How many tiles freeze", "type": "float", "slider": true, "min": 0.01, "max": 0.5, "step": 0.01, "default": 0.06 }
