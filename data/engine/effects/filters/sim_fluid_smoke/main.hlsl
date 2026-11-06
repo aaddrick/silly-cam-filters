@@ -148,10 +148,10 @@ float4 PSDye(VertData v_in) : TARGET
     float2 uv = v_in.uv;
     float2 v = project.Sample(textureSampler, uv).xy;
     float4 d = dye_prev.Sample(textureSampler, uv - v * pass_texel);
-    d *= dissipation;
+    d = max(d * dissipation - 0.006, 0.0);
     float3 mo = motion_at(uv);
     float3 col = rainbow ? hue(float(frame_index) * 0.004) * 0.9 + 0.1 : dye_color.rgb;
-    float amt = mo.x * 0.12;
+    float amt = mo.x * 0.05;
     d.rgb = d.rgb + col * amt;
     d.a = max(d.a * dissipation, amt);
     d = clamp(d, 0.0, 1.5);
