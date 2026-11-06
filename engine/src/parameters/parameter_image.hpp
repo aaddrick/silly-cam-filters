@@ -213,14 +213,18 @@ class effect_parameter_image : public effect_parameter_image_detail::base_param 
             }
         }
 
-        void set_data_from_settings(obs_data_t *settings, const char *full_param_name) override {
+        // Silly Cam Filters engine: the caller passes the EFFECT name. Build the full
+        // settings key first, so "Use custom file" on a param with bundled values reads
+        // the list choice and then the file picker key (was: looked up the effect name).
+        void set_data_from_settings(obs_data_t *settings, const char *effect_name) override {
             bool with_values = !values.empty();
+            std::string full_param_name = get_full_param_name(effect_name);
 
             if (with_values) {
-                const char *path_ = obs_data_get_string(settings, full_param_name);
-                if (strcmp(path_, PARAM_STR_CUSTOM_VALUE) == 0) {
-                    std::string full_param_name_filepicker = std::string(full_param_name) + PARAM_STR_CUSTOM_SETTING;
-                    set_data_from_settings_sub(settings, full_param_name_filepicker.c_str());
+                const char *path_ = obs_data_get_string(settings, full_param_name.c_str());
+                if (path_ != nullptr && strcmp(path_, PARAM_STR_CUSTOM_VALUE) == 0) {
+                    std::string full_param_name_filepicker = full_param_name + PARAM_STR_CUSTOM_SETTING;
+                    set_data_from_settings_sub(settings, full_param_name_filepicker);
                     return;
                 }
             }
@@ -228,8 +232,8 @@ class effect_parameter_image : public effect_parameter_image_detail::base_param 
             set_data_from_settings_sub(settings, full_param_name);
         }
 
-        void set_data_from_settings_sub(obs_data_t *settings, const char *effect_name) {
-            std::string full_param_name = get_full_param_name(effect_name);
+        // Silly Cam Filters engine: takes the full settings key (no re-prefixing).
+        void set_data_from_settings_sub(obs_data_t *settings, const std::string &full_param_name) {
             const char *path_ = obs_data_get_string(settings, full_param_name.c_str());
             if (path_ != nullptr) {
                 std::string path_str = std::string(path_);
