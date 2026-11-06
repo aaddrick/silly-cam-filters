@@ -1,7 +1,7 @@
 // Kuwahara Oil Paint: anisotropic Kuwahara filter in three passes.
 //   tensor:  structure tensor (Sobel gradients) of the picture, at half size
 //   blurred: smooth the tensor (separable blur, alternating direction)
-//   paint:   8-sector Kuwahara on an ellipse that follows the local edge direction;
+//   paint:   (two coats, the second repaints the first) 8-sector Kuwahara on an ellipse that follows the local edge direction;
 //            each sector is weighted by 1 / (1 + variance^q), so flat regions
 //            get painted flat and edges stay sharp.
 
@@ -10,6 +10,7 @@ uniform float boost;
 
 uniform texture2d tensor;
 uniform texture2d blurred;
+uniform texture2d paint;
 
 uniform float2 pass_texel;
 uniform int iteration;
@@ -33,12 +34,10 @@ VertData VSDefault(VertData v_in)
     return vert_out;
 }
 
-#define sharpness 8.0
-#define stretch 0.6
-
 float4 src(float2 uv)
 {
-    return image.Sample(textureSampler, uv);
+    if (iteration == 0) return image.Sample(textureSampler, uv);
+    return paint.Sample(textureSampler, uv);
 }
 
 float lum(float3 c)
@@ -95,8 +94,11 @@ float4 PSPaint(VertData v_in) : TARGET
     // strokes run along the edge, perpendicular to the gradient
     float2 gdir = float2(cos(phi), sin(phi));
     float2 tdir = float2(-gdir.y, gdir.x);
-    float elong = 1.0 + stretch * 2.0 * aniso;
+    float elong = 1.0 + 1.2 * aniso;
     float squash = 1.0 / elong;
+    // small brush on fine detail (eyes, mouth, lettering): the smoothed gradient energy shrinks the
+    // ellipse there, so flat areas get big strokes and features keep their shape (small faces too).
+    float rad = radius * clamp(1.0 / (1.0 + 4.0 * sqrt(max(E + G, 0.0))), 0.35, 1.0);
 
     float4 m[8];
     float4 s[8];
@@ -112,7 +114,7 @@ float4 PSPaint(VertData v_in) : TARGET
             float r2 = dot(q, q);
             if (r2 <= 1.0) {
                 float2 e = q.x * elong * tdir + q.y * squash * gdir;
-                float2 uv = v_in.uv + e * radius * float2(upixel, vpixel);
+                float2 uv = v_in.uv + e * rad * float2(upixel, vpixel);
                 float3 c = src(uv).rgb;
                 float l = lum(c);
                 float ang = atan2(q.y, q.x);
@@ -136,14 +138,32 @@ float4 PSPaint(VertData v_in) : TARGET
         float3 mean = m[k].rgb / w;
         float ml = s[k].y / w;
         float sd = sqrt(max(s[k].x / w - ml * ml, 0.0));
-        float wk = 1.0 / (1.0 + pow(sd * 60.0, sharpness));
+        float wk = 1.0 / (1.0 + pow(sd * 60.0, 8.0));
         acc += mean * wk;
         wsum += wk;
     }
-    float3 outc = acc / max(wsum, 0.0001);
-    // colour boost: saturation only, black level and brightness are kept
-    float g = lum(outc);
-    outc = saturate(lerp(float3(g, g, g), outc, 1.0 + boost));
+    // weights can all be ~1e-12 in busy texture (eyes, mouth, badges); a 1e-4 floor here turned
+    // those pixels black (r3 blotches). Normalise by the true sum.
+    float3 outc = acc / max(wsum, 1e-30);
+    if (iteration == 1) {
+        // last coat: tone-preserving finish. Re-sharpen the strokes MULTIPLICATIVELY around the
+        // local mean (a dark pixel can only be scaled, never pushed to black), then saturation
+        // around the pixel's own luma. No global contrast: black and white points stay the source's.
+        float2 px = float2(upixel, vpixel) * 1.5;
+        float3 nb = 0.25 * (src(v_in.uv + float2(px.x, 0.0)).rgb + src(v_in.uv - float2(px.x, 0.0)).rgb
+                          + src(v_in.uv + float2(0.0, px.y)).rgb + src(v_in.uv - float2(0.0, px.y)).rgb);
+        float lk = lum(outc);
+        float ln = lum(nb);
+        float ratio = clamp(1.0 + 1.2 * (lk - ln) / max(ln, 0.08), 0.9, 1.3);
+        outc *= ratio;
+        float g = lum(outc);
+        outc = saturate(lerp(float3(g, g, g), outc, 1.0 + boost));
+        // keep the source's local white points: a thin highlight the brush painted over may come
+        // out at most 0.12 darker than the source (no new dark spots on bright lines)
+        float ls = lum(center.rgb);
+        float lo = lum(outc);
+        if (lo < ls - 0.12) outc = saturate(outc * ((ls - 0.12) / max(lo, 0.001)));
+    }
     return float4(outc, center.a);
 }
 
