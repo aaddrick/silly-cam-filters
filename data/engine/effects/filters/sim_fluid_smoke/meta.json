@@ -1,0 +1,26 @@
+{
+  "metafileVersion": 1,
+  "label": "Fluid Smoke",
+  "about": {
+    "author_name": "Silly Cam Filters",
+    "description": "Wave your hands and leave colored smoke that swirls and drifts. Motion in the camera stirs a stable-fluids simulation."
+  },
+  "parameters": [
+    { "name": "motion_threshold", "label": "Motion sensitivity (lower = more)", "type": "float", "slider": true, "min": 0.01, "max": 0.3, "step": 0.005, "default": 0.06 },
+    { "name": "force", "label": "Stir strength", "type": "float", "slider": true, "min": 0.0, "max": 4.0, "step": 0.05, "default": 1.5 },
+    { "name": "dissipation", "label": "Smoke lifetime", "type": "float", "slider": true, "min": 0.90, "max": 0.999, "step": 0.001, "default": 0.96 },
+    { "name": "rise", "label": "Smoke rises", "type": "float", "slider": true, "min": 0.0, "max": 1.0, "step": 0.01, "default": 0.25 },
+    { "name": "dye_color", "label": "Smoke color", "type": "color", "default": "#FFFF6AE0" },
+    { "name": "rainbow", "label": "Cycle colors", "type": "bool", "default": true },
+    { "name": "strength", "label": "Smoke strength", "type": "float", "slider": true, "min": 0.0, "max": 2.0, "step": 0.05, "default": 1.0 },
+    { "name": "smoke_only", "label": "Show only the smoke", "type": "bool", "default": false }
+  ],
+  "passes": [
+    { "name": "vel", "technique": "Vel", "size": [128, 72], "format": "rgba16f" },
+    { "name": "div", "technique": "Div", "size": [128, 72], "format": "rgba16f" },
+    { "name": "pressure", "technique": "Pressure", "size": [128, 72], "format": "rgba16f", "iterations": 20 },
+    { "name": "project", "technique": "Project", "size": [128, 72], "format": "rgba16f" },
+    { "name": "dye", "technique": "Dye", "size": [128, 72], "format": "rgba16f" },
+    { "name": "out", "technique": "Draw" }
+  ]
+}
