@@ -1,19 +1,15 @@
 // Kuwahara Oil Paint: anisotropic Kuwahara filter in three passes.
 //   tensor:  structure tensor (Sobel gradients) of the picture, at half size
 //   blurred: smooth the tensor (separable blur, alternating direction)
-//   paint:   (repeated `coats` times, each coat repaints the last) 8-sector Kuwahara on an ellipse that follows the local edge direction;
+//   paint:   8-sector Kuwahara on an ellipse that follows the local edge direction;
 //            each sector is weighted by 1 / (1 + variance^q), so flat regions
 //            get painted flat and edges stay sharp.
 
 uniform float radius;
-uniform float sharpness;
-uniform float stretch;
 uniform float boost;
 
 uniform texture2d tensor;
 uniform texture2d blurred;
-uniform texture2d paint;
-uniform int coats;
 
 uniform float2 pass_texel;
 uniform int iteration;
@@ -37,10 +33,12 @@ VertData VSDefault(VertData v_in)
     return vert_out;
 }
 
+#define sharpness 8.0
+#define stretch 0.6
+
 float4 src(float2 uv)
 {
-    if (iteration == 0) return image.Sample(textureSampler, uv);
-    return paint.Sample(textureSampler, uv);
+    return image.Sample(textureSampler, uv);
 }
 
 float lum(float3 c)
@@ -143,16 +141,9 @@ float4 PSPaint(VertData v_in) : TARGET
         wsum += wk;
     }
     float3 outc = acc / max(wsum, 0.0001);
-    if (iteration == coats - 1) {
-        // last coat: re-sharpen the strokes (keeps eyes/mouth edges) and push the colour a little
-        float2 px = float2(upixel, vpixel) * 1.5;
-        float3 nb = 0.25 * (src(v_in.uv + float2(px.x, 0.0)).rgb + src(v_in.uv - float2(px.x, 0.0)).rgb
-                          + src(v_in.uv + float2(0.0, px.y)).rgb + src(v_in.uv - float2(0.0, px.y)).rgb);
-        outc += (outc - nb) * (0.6 + boost);
-        float g = lum(outc);
-        outc = lerp(float3(g, g, g), outc, 1.0 + boost);
-        outc = saturate(0.5 + (outc - 0.5) * (1.0 + 0.5 * boost));
-    }
+    // colour boost: saturation only, black level and brightness are kept
+    float g = lum(outc);
+    outc = saturate(lerp(float3(g, g, g), outc, 1.0 + boost));
     return float4(outc, center.a);
 }
 
