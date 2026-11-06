@@ -2,7 +2,11 @@
 // face lost, garbage landmarks) the whole frame is censored. The mask is the face oval (landmarks 10/152/234/454,
 // in the face frame, so it rolls with the head) dilated by "margin" plus a speed term (the landmarks lag a moving
 // face), united with the face mesh itself (preraster), with a soft edge that lies entirely OUTSIDE that area.
-// track (1x1 rgba32f): (eyes-mid.xy UV, smoothed speed ISO/s, last block size ISO)
+// track (3x1 rgba32f): 0 = (eyes-mid.xy UV, smoothed speed ISO/s, last block size ISO)
+//                      1 = (face x axis.xy ISO, socket distance ISO, seconds since the face was lost)
+//                      2 = face oval in the face frame (centre.xy, half size.xy)
+// Fix r2 (D36): on a detection dropout the last dilated oval is HELD for FC_HOLD seconds, growing with time, before
+// the whole frame is censored. Before the first detection (no oval known) the whole frame is censored at once.
 @include "silly_face.hlsl"
 
 uniform int style;
@@ -33,6 +37,12 @@ VertData VSDefault(VertData v_in) {
 
 #define FC_LATENCY 0.2          // seconds of landmark lag the speed margin covers
 #define FC_FALLBACK_BLOCK 0.05  // block size (ISO) when no face is known: ~1/20 of the frame height
+#define FC_HOLD 0.5             // seconds the last face region is held through a dropout
+#define FC_HOLD_GROW 1.2        // extra dilation per held second, in eye distances (head may keep moving)
+#define FC_HOLD_PAD 0.15        // extra dilation while held (the mesh union is not available then)
+
+float4 fc_prev(float i) { return track_prev.Sample(sf_point_sampler, float2((i + 0.5) / 3.0, 0.5)); }
+float4 fc_cur(float i) { return track.Sample(sf_point_sampler, float2((i + 0.5) / 3.0, 0.5)); }
 
 // block size in ISO units: a fraction of the face width (~2.2 socket distances)
 float fc_block_iso(float last) {
@@ -43,10 +53,24 @@ float fc_block_iso(float last) {
 }
 
 float4 PSTrack(VertData v_in) : TARGET {
-    float4 prev = track_prev.Sample(sf_point_sampler, v_in.uv);
+    int k = int(floor(v_in.uv.x * 3.0));
+    float4 prev = fc_prev(0.0);
+    float4 prev1 = fc_prev(1.0);
     float dt = clamp(delta_time, 0.001, 0.1);
     if (!sf_face_ok()) {
-        return float4(prev.xy, 0.0, prev.w);
+        if (k == 1) {
+            return float4(prev1.xyz, prev1.w + dt);   // keep the frame, count the time lost
+        }
+        if (k == 2) {
+            return fc_prev(2.0);
+        }
+        return prev;                                   // keep position, speed (for the held dilation) and block
+    }
+    if (k == 1) {
+        return float4(sf_face_x(), sf_face_scale(), 0.0);
+    }
+    if (k == 2) {
+        return sf_face_oval_local();
     }
     float2 mid = sf_eyes_mid();
     bool fresh = prev.z <= 0.0 && prev.x == 0.0 && prev.y == 0.0;
@@ -59,7 +83,7 @@ float4 PSTrack(VertData v_in) : TARGET {
 // --- blur (quarter scale, separable, 9 taps, spacing from the block size). Two copies, because OBS's GLSL
 // translation does not accept texture2d function parameters.
 float2 blur_step(float2 dir) {
-    float4 t = track.Sample(sf_point_sampler, float2(0.5, 0.5));
+    float4 t = fc_cur(0.0);
     return sf_from_iso(dir * fc_block_iso(t.w) * 0.25);
 }
 float4 PSBlurH(VertData v_in) : TARGET {
@@ -107,10 +131,26 @@ float4 censored(float2 uv, float b) {
 
 float4 PSDraw(VertData v_in) : TARGET {
     float4 src = image.Sample(textureSampler, v_in.uv);
-    float4 t = track.Sample(sf_point_sampler, float2(0.5, 0.5));
+    float4 t = fc_cur(0.0);
     float b = fc_block_iso(t.w);
     if (!sf_face_ok()) {
-        return float4(censored(v_in.uv, b).rgb, src.a);   // fail closed
+        float4 f = fc_cur(1.0);
+        float4 ho = fc_cur(2.0);
+        // fail closed: whole frame unless a face region is known and the dropout is younger than FC_HOLD
+        if (!(f.z > 0.01 && f.z < 2.0 && f.w < FC_HOLD && ho.z > 0.0 && ho.w > 0.0)) {
+            return float4(censored(v_in.uv, b).rgb, src.a);
+        }
+        float2 fx = f.xy;
+        float2 fy = float2(-fx.y, fx.x);
+        float2 dd = sf_to_iso(v_in.uv) - sf_to_iso(t.xy);
+        float2 lh = float2(dot(dd, fx), dot(dd, fy)) / f.z;
+        float2 hgrow = ho.zw * (margin + FC_HOLD_PAD) + (t.z * (FC_LATENCY + f.w) + b) / f.z + FC_HOLD_GROW * f.w;
+        float dh = length((lh - ho.xy) / (ho.zw + hgrow));
+        float wh = 1.0 - smoothstep(1.0, 1.08, dh);
+        if (wh <= 0.0) {
+            return src;
+        }
+        return float4(lerp(src.rgb, censored(v_in.uv, b).rgb, wh), src.a);
     }
     float s = max(sf_face_scale(), 1e-4);
     float4 o = sf_face_oval_local();
