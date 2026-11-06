@@ -8,6 +8,7 @@ uniform int gravity_steps;
 uniform float spawn_rate;
 uniform float initial_sand;
 uniform float sink_rate;
+uniform float evaporate;
 uniform float restart_seconds;
 uniform bool reset;
 uniform float4 sand_tint;
@@ -148,6 +149,10 @@ float4 PSSand(VertData v_in) : TARGET
 
     // Sink at the bottom row.
     if (is_sand(outc) && t.y > pass_size.y - 1.5 && hash21(t, float(frame_index) * 0.37 + float(iteration)) < sink_rate)
+        outc = EMPTY();
+
+    // Sand evaporates slowly everywhere, so the pile reaches a steady height instead of burying the picture.
+    if (is_sand(outc) && evaporate > 0.0 && hash21(t, float(frame_index) * 0.53 + float(iteration) * 7.0 + 31.0) < evaporate)
         outc = EMPTY();
 
     // New sand from bright camera pixels.
