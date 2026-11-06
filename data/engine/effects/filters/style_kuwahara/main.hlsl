@@ -8,6 +8,7 @@
 uniform float radius;
 uniform float sharpness;
 uniform float stretch;
+uniform float boost;
 
 uniform texture2d tensor;
 uniform texture2d blurred;
@@ -137,11 +138,22 @@ float4 PSPaint(VertData v_in) : TARGET
         float3 mean = m[k].rgb / w;
         float ml = s[k].y / w;
         float sd = sqrt(max(s[k].x / w - ml * ml, 0.0));
-        float wk = 1.0 / (1.0 + pow(sd * 25.0, sharpness));
+        float wk = 1.0 / (1.0 + pow(sd * 60.0, sharpness));
         acc += mean * wk;
         wsum += wk;
     }
-    return float4(acc / max(wsum, 0.0001), center.a);
+    float3 outc = acc / max(wsum, 0.0001);
+    if (iteration == coats - 1) {
+        // last coat: re-sharpen the strokes (keeps eyes/mouth edges) and push the colour a little
+        float2 px = float2(upixel, vpixel) * 1.5;
+        float3 nb = 0.25 * (src(v_in.uv + float2(px.x, 0.0)).rgb + src(v_in.uv - float2(px.x, 0.0)).rgb
+                          + src(v_in.uv + float2(0.0, px.y)).rgb + src(v_in.uv - float2(0.0, px.y)).rgb);
+        outc += (outc - nb) * (0.6 + boost);
+        float g = lum(outc);
+        outc = lerp(float3(g, g, g), outc, 1.0 + boost);
+        outc = saturate(0.5 + (outc - 0.5) * (1.0 + 0.5 * boost));
+    }
+    return float4(outc, center.a);
 }
 
 technique Tensor { pass { vertex_shader = VSDefault(v_in); pixel_shader = PSTensor(v_in); } }
