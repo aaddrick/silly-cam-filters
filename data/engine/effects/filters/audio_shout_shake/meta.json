@@ -5,7 +5,7 @@
   "parameters": [
     { "type": "facetracking", "name": "fd", "use_preraster": true, "reset_on_face_lost": { "prompt": true, "default": true } },
     { "name": "audio_level", "label": "Audio Source", "type": "audiolevel" },
-    { "name": "threshold", "label": "Loudness threshold (dB)", "type": "float", "slider": true, "min": -60.0, "max": -5.0, "step": 0.5, "default": -30.0 },
+    { "name": "threshold", "label": "Loudness threshold (dB)", "type": "float", "slider": true, "min": -60.0, "max": -5.0, "step": 0.5, "default": -24.0 },
     { "name": "shake_amount", "label": "Shake", "type": "float", "slider": true, "min": 0.0, "max": 0.05, "step": 0.001, "default": 0.012 },
     { "name": "swell", "label": "Face swell", "type": "float", "slider": true, "min": 0.0, "max": 0.35, "step": 0.01, "default": 0.2 },
     { "name": "vignette", "label": "Red vignette", "type": "float", "slider": true, "min": 0.0, "max": 1.0, "step": 0.01, "default": 0.6 }
