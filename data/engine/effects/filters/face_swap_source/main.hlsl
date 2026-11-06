@@ -64,12 +64,6 @@ float4 PSDraw(VertData v_in) : TARGET {
     if (p <= 0.001 || face_src_size.x < 0.5 || face_src_size.y < 0.5 || !sf_face_ok()) {
         return src;
     }
-    float2 c = sf_canon_at(v_in.uv);
-    if (c.x < 0.0) {
-        return src;
-    }
-    float2 ci = float2(c.x, 1.0 - c.y);
-
     // canonical anchor points (image-style): eye sockets and inner-mouth centre
     float2 cl = 0.5 * (fw_canon_img(SF_LM_EYE_L_OUTER) + fw_canon_img(SF_LM_EYE_L_INNER));
     float2 cr = 0.5 * (fw_canon_img(SF_LM_EYE_R_OUTER) + fw_canon_img(SF_LM_EYE_R_INNER));
@@ -77,6 +71,35 @@ float4 PSDraw(VertData v_in) : TARGET {
                       + fw_canon_img(SF_LM_LIP_IN_L) + fw_canon_img(SF_LM_LIP_IN_R));
     float ce_y = 0.5 * (cl.y + cr.y);
     float ce_x = 0.5 * (cl.x + cr.x);
+
+    // Mouth lock (fix r2): on an open or smiling mouth the mesh tears the canonical lip line open, so the source's
+    // mouth split across the opening and landed low. Around the mouth, map with a rigid frame on the tracked
+    // inner-mouth centre instead (the source's mouth stays closed and centred on the user's mouth, filling the
+    // opening), blended back into the mesh mapping over an ellipse around the mouth.
+    float2 fx = sf_face_x();
+    float2 fy = sf_face_y();
+    float2 mc_iso = sf_to_iso(sf_mouth_center());
+    float mw = max(sf_mouth_width(), 1e-4);
+    float2 dm = sf_to_iso(v_in.uv) - mc_iso;
+    float mu = dot(dm, fx);
+    float mv = dot(dm, fy);
+    float kx = distance(fw_canon_img(SF_LM_MOUTH_L), fw_canon_img(SF_LM_MOUTH_R)) / mw;
+    float ky = (cm.y - ce_y) / max(dot(mc_iso - sf_to_iso(sf_eyes_mid()), fy), 1e-4);
+    float2 c_mouth = cm + float2(mu * kx, mv * ky);
+    float m_ell = length(float2(mu / (0.80 * mw), mv / (0.42 * mw + 0.5 * sf_mouth_gap())));
+    float wm = 1.0 - smoothstep(0.65, 1.0, m_ell);
+
+    float2 c = sf_canon_at(v_in.uv);
+    float2 ci;
+    if (c.x < 0.0) {
+        // no mesh triangle: outside the face, or inside the open mouth (the mesh has a hole there)
+        if (wm < 0.999) {
+            return src;
+        }
+        ci = c_mouth;
+    } else {
+        ci = lerp(float2(c.x, 1.0 - c.y), c_mouth, wm);
+    }
     float sx = src_eye_dist / max(cr.x - cl.x, 1e-4);
     float sy = (src_mouth_y - src_eyes_y) / max(cm.y - ce_y, 1e-4);
     float2 suv = float2(src_cx + (ci.x - ce_x) * sx, src_eyes_y + (ci.y - ce_y) * sy);
@@ -100,6 +123,13 @@ float4 PSDraw(VertData v_in) : TARGET {
     // soft border towards the face outline (rolled oval through lm 10 / 152 / 234 / 454)
     float d = sf_face_ellipse_dist_rolled(v_in.uv);
     w *= 1.0 - smoothstep(1.0 - edge, 1.02, d);
+    // fix r2: the upper half of the oval (temples, hairline) is where a photo's hair or background and the user's own
+    // hair meet: use a narrower, lower oval above the eye line, so the borrowed forehead never paints over hair.
+    float4 ov = sf_face_oval_local();
+    float2 lq = sf_to_local(v_in.uv) - ov.xy;
+    float up = smoothstep(0.0, 0.4, -(lq.y + ov.y));                 // 0 below the eye line, 1 from 0.4 above it
+    float d_top = length(lq / (ov.zw * float2(0.80, 0.82)));
+    w *= 1.0 - up * smoothstep(1.0 - max(edge, 0.12), 1.0, d_top);
     if (own_features) {
         w *= smoothstep(0.85, 1.35, sf_eye_l_dist(v_in.uv));
         w *= smoothstep(0.85, 1.35, sf_eye_r_dist(v_in.uv));
