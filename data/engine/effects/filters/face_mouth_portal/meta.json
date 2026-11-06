@@ -1,0 +1,36 @@
+{
+  "metafileVersion": 1,
+  "label": "[Face Tracking] Mouth Portal",
+  "about": {
+    "author_name": "Silly Cam Filters",
+    "author_url": "",
+    "description": "Open your mouth to reveal another OBS source inside it (a scene, a video, a picture), with a glowing portal rim."
+  },
+  "parameters": [
+    {
+      "type": "facetracking",
+      "name": "fd",
+      "use_preraster": true,
+      "reset_on_face_lost": { "prompt": true, "default": true }
+    },
+    { "name": "portal", "label": "Source inside the mouth", "type": "source" },
+    {
+      "name": "min_open", "label": "Opens when the mouth is open by", "type": "float", "slider": true,
+      "min": 0.0, "max": 0.6, "step": 0.01, "default": 0.12,
+      "description": "Lip gap as a share of the mouth width. Small = the portal shows while talking; large = only a wide-open mouth."
+    },
+    {
+      "name": "zoom", "label": "Zoom", "type": "float", "slider": true,
+      "min": 0.5, "max": 3.0, "step": 0.01, "default": 1.0
+    },
+    {
+      "name": "rim", "label": "Portal glow", "type": "float", "slider": true,
+      "min": 0.0, "max": 1.0, "step": 0.01, "default": 0.6
+    },
+    { "name": "rim_color", "label": "Glow colour", "type": "color", "default": "#FF3CE0FF" }
+  ],
+  "passes": [
+    { "name": "presence", "technique": "Presence", "size": [1, 1], "format": "rgba16f" },
+    { "name": "out", "technique": "Draw" }
+  ]
+}
