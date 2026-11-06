@@ -87,13 +87,15 @@ float4 PSCutout(VertData v_in) : TARGET
     float l22 = lum(image.Sample(textureSampler, v_in.uv + float2(d.x, d.y)).rgb);
     float gx = (l20 + 2.0 * l21 + l22) - (l00 + 2.0 * l01 + l02);
     float gy = (l02 + 2.0 * l12 + l22) - (l00 + 2.0 * l10 + l20);
-    float edge = smoothstep(0.25, 0.6, sqrt(gx * gx + gy * gy)) * edge_strength;
+    float mean_l = avg.Sample(textureSampler, v_in.uv).r;
+    // gradient relative to local brightness, so dim webcams and darker skin get outlines too
+    float edge = smoothstep(0.1, 0.3, sqrt(gx * gx + gy * gy) / (mean_l + 0.12)) * edge_strength;
 
     // paper grain: a few octaves of value noise in pixel space
     float2 pp = v_in.uv / px;
     float n = vnoise(pp * 0.5) * 0.5 + vnoise(pp * 0.17 + 7.3) * 0.35 + hash21(floor(pp)) * 0.15;
 
-    float mean = avg.Sample(textureSampler, v_in.uv).r;
+    float mean = mean_l;
     float rel = l11 / (l11 + 1.4 * max(mean, 0.05));
     float base = lerp(l11, rel, auto_tone);
     float x = base + (n - 0.5) * grain * (1.0 / float(levels)) * 1.0;
