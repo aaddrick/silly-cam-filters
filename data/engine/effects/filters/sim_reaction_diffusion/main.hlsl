@@ -60,7 +60,7 @@ float4 PSMean(VertData v_in) : TARGET
     float acc = 0.0;
     for (int j = 0; j < 8; j++) {
         for (int i = 0; i < 8; i++) {
-            float2 p = (float2(float(i), float(j)) + 0.5) / 8.0 + v_in.uv * 0.0;
+            float2 p = (float2(float(i), float(j)) + 0.5) / 8.0 + (v_in.uv - 0.5) * 1e-5;
             acc += dot(image.Sample(textureSampler, p).rgb, float3(0.299, 0.587, 0.114));
         }
     }
@@ -70,7 +70,7 @@ float4 PSMean(VertData v_in) : TARGET
 // Restart clock (see header). One texel; every rd texel reads the same decision.
 float4 PSClock(VertData v_in) : TARGET
 {
-    float4 c = clock_prev.Sample(pointSampler, float2(0.5, 0.5) + v_in.uv * 0.0);
+    float4 c = clock_prev.Sample(pointSampler, float2(0.5, 0.5) + (v_in.uv - 0.5) * 1e-5);
     bool started = c.a > 0.5 && abs(c.a - 1.0 - rand_seed) < 0.0001;
     float frames = c.g + 1.0;
     float secs = time - c.b;

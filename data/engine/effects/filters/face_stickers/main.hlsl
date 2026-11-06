@@ -131,7 +131,7 @@ float4 PSPresence(VertData v_in) : TARGET {
 
 float4 PSDraw(VertData v_in) : TARGET {
     float4 src = image.Sample(textureSampler, v_in.uv);
-    float p = presence.Sample(sf_point_sampler, float2(0.5, 0.5) + 0.0 * v_in.uv).r;
+    float p = presence.Sample(sf_point_sampler, float2(0.5, 0.5) + (v_in.uv - 0.5) * 1e-5).r;
     float s = fs_scale();
     // Stale landmarks are kept bound after a loss, so the sticker fades out in place.
     // Before the first detection the points texture is empty (scale 0): draw nothing.

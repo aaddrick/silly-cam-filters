@@ -55,7 +55,7 @@ float4 PSMean(VertData v_in) : TARGET
     float acc = 0.0;
     for (int j = 0; j < 8; j++) {
         for (int i = 0; i < 8; i++) {
-            float2 p = (float2(float(i), float(j)) + 0.5) / 8.0 + v_in.uv * 0.0;
+            float2 p = (float2(float(i), float(j)) + 0.5) / 8.0 + (v_in.uv - 0.5) * 1e-5;
             acc += dot(image.Sample(textureSampler, p).rgb, float3(0.299, 0.587, 0.114));
         }
     }

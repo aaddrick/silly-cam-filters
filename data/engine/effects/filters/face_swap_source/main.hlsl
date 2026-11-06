@@ -60,7 +60,7 @@ float2 fw_canon_img(int i) {
 
 float4 PSDraw(VertData v_in) : TARGET {
     float4 src = image.Sample(textureSampler, v_in.uv);
-    float p = presence.Sample(sf_point_sampler, float2(0.5, 0.5) + 0.0 * v_in.uv).r;
+    float p = presence.Sample(sf_point_sampler, float2(0.5, 0.5) + (v_in.uv - 0.5) * 1e-5).r;
     if (p <= 0.001 || face_src_size.x < 0.5 || face_src_size.y < 0.5 || !sf_face_ok()) {
         return src;
     }
