@@ -3,9 +3,9 @@
   "label": "Pixel Sort",
   "about": { "author_name": "Silly Cam Filters", "description": "Bright and dark pixels melt into sorted streaks. More steps, longer streaks." },
   "parameters": [
-    { "name": "lum_low", "label": "Darkest pixel to sort", "type": "float", "slider": true, "min": 0.0, "max": 1.0, "step": 0.01, "default": 0.25 },
-    { "name": "lum_high", "label": "Brightest pixel to sort", "type": "float", "slider": true, "min": 0.0, "max": 1.0, "step": 0.01, "default": 0.85 },
-    { "name": "sort_steps", "label": "Streak length", "type": "int", "slider": true, "min": 2, "max": 512, "step": 1, "default": 64 },
+    { "name": "lum_low", "label": "Darkest pixel to sort", "type": "float", "slider": true, "min": 0.0, "max": 1.0, "step": 0.01, "default": 0.05 },
+    { "name": "lum_high", "label": "Brightest pixel to sort", "type": "float", "slider": true, "min": 0.0, "max": 1.0, "step": 0.01, "default": 0.7 },
+    { "name": "sort_steps", "label": "Streak length", "type": "int", "slider": true, "min": 2, "max": 640, "step": 1, "default": 192 },
     { "name": "direction", "label": "Direction", "type": "list_int",
       "values": [ { "label": "Sideways", "value": 0 }, { "label": "Up and down", "value": 1 } ], "default": 0 },
     { "name": "reverse", "label": "Bright first", "type": "bool", "default": false }

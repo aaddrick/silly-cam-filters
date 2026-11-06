@@ -52,7 +52,21 @@ float4 PSStart(VertData v_in) : TARGET
 {
     float4 c = image.Sample(textureSampler, v_in.uv);
     float l = lum(c.rgb);
-    float m = (l >= lum_low && l <= lum_high) ? 1.0 : 0.0;
+    // thresholds are relative to the frame's own brightness range (8x8 grid min/max),
+    // so dim webcams and darker skin get streaks too
+    float mn = 1.0;
+    float mx = 0.0;
+    for (int j = 0; j < 8; j++) {
+        for (int i = 0; i < 8; i++) {
+            float lg = lum(image.Sample(textureSampler, (float2(float(i), float(j)) + 0.5) / 8.0).rgb);
+            mn = min(mn, lg);
+            mx = max(mx, lg);
+        }
+    }
+    float rng = max(mx - mn, 0.05);
+    float lo = mn + lum_low * rng;
+    float hi = mn + lum_high * rng;
+    float m = (l >= lo && l <= hi) ? 1.0 : 0.0;
     return float4(c.rgb, m);
 }
 
