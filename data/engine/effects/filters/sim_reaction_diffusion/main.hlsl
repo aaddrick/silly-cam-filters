@@ -113,7 +113,7 @@ float4 PSStep(VertData v_in) : TARGET
     if (preset == 1) { F = 0.030;  k = 0.0565; }
     else if (preset == 2) { F = 0.029; k = 0.057; }
     else if (preset == 3) { F = 0.0367; k = 0.0649; }
-    F += (lum - 0.5) * 0.008 * follow;
+    F += (lum - 0.5) * 0.03 * follow;
 
     float uvv = s.r * s.g * s.g;
     float U = s.r + 1.0 * lap.r - uvv + F * (1.0 - s.r);
@@ -131,6 +131,8 @@ float4 PSStep(VertData v_in) : TARGET
         float seed = saturate(edge * 4.0 - 0.3) * seed_edges;
         V = max(V, seed);
     }
+    // The pattern dies off on the brighter parts of the picture (skin, white shirts), so faces stay clear.
+    V *= 1.0 - follow * 0.12 * smoothstep(0.45, 0.65, lum);
     U = clamp(U, 0.0, 1.0);
     V = clamp(V, 0.0, 1.0);
     return float4(U, V, 0.0, 1.0);
@@ -147,7 +149,14 @@ float4 PSDraw(VertData v_in) : TARGET
     float rim = smoothstep(0.02, 0.10, V) - p;
     skin = lerp(skin, skin * 0.35, rim);
     float3 shown = lerp(base.rgb, skin, saturate(p + rim * 0.6));
-    float3 rgb = lerp(base.rgb, shown, mix_amount);
+    // Fade in after a restart and out before the next one.
+    float vis = 1.0;
+    if (restart_seconds > 0.5) {
+        float period = restart_seconds * 30.0;
+        float ph = fmod(float(frame_index), period);
+        vis = saturate(min(ph / 45.0, (period - ph) / 45.0));
+    }
+    float3 rgb = lerp(base.rgb, shown, mix_amount * vis);
     if (show_chemical)
         rgb = lerp(float3(0.0, 0.0, 0.0), pattern_color.rgb, saturate(V * 2.0));
     return float4(rgb, base.a);
