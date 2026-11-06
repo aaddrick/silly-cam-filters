@@ -1,0 +1,112 @@
+{
+  "metafileVersion": 1,
+  "label": "Game of Life",
+  "about": {
+    "author_name": "Silly Cam Filters",
+    "description": "Conway's Game of Life grows over your picture. Bright parts of the camera plant living cells, and the cells live, die and drift on top of you."
+  },
+  "parameters": [
+    {
+      "name": "cell_size",
+      "label": "Cell size",
+      "type": "int",
+      "slider": true,
+      "min": 1,
+      "max": 4,
+      "step": 1,
+      "default": 2
+    },
+    {
+      "name": "seed_threshold",
+      "label": "Seed brightness",
+      "type": "float",
+      "slider": true,
+      "min": 0.0,
+      "max": 1.0,
+      "step": 0.01,
+      "default": 0.55
+    },
+    {
+      "name": "seed_dark",
+      "label": "Seed from dark parts instead",
+      "type": "bool",
+      "default": false
+    },
+    {
+      "name": "inject",
+      "label": "Camera feeds new cells",
+      "type": "float",
+      "slider": true,
+      "min": 0.0,
+      "max": 0.3,
+      "step": 0.005,
+      "default": 0.06
+    },
+    {
+      "name": "step_every",
+      "label": "Frames per step",
+      "type": "int",
+      "slider": true,
+      "min": 1,
+      "max": 30,
+      "step": 1,
+      "default": 4
+    },
+    {
+      "name": "restart_seconds",
+      "label": "Restart every (seconds at 30 fps, 0 = never)",
+      "type": "float",
+      "slider": true,
+      "min": 0.0,
+      "max": 60.0,
+      "step": 1.0,
+      "default": 20.0
+    },
+    {
+      "name": "overlay_color",
+      "label": "Cell color",
+      "type": "color",
+      "default": "#FF33FF99"
+    },
+    {
+      "name": "overlay_strength",
+      "label": "Cell strength",
+      "type": "float",
+      "slider": true,
+      "min": 0.0,
+      "max": 1.0,
+      "step": 0.01,
+      "default": 0.9
+    },
+    {
+      "name": "test_pattern",
+      "label": "Test pattern (blinker and glider)",
+      "type": "bool",
+      "default": false
+    }
+  ],
+  "passes": [
+    {
+      "name": "meanl",
+      "technique": "Mean",
+      "size": [
+        1,
+        1
+      ],
+      "format": "rgba32f"
+    },
+    {
+      "name": "life",
+      "technique": "Life",
+      "size": [
+        384,
+        216
+      ],
+      "format": "rgba32f"
+    },
+    {
+      "name": "out",
+      "technique": "Draw"
+    }
+  ]
+}
