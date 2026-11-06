@@ -1,0 +1,15 @@
+{
+  "metafileVersion": 1,
+  "label": "Bass Bounce",
+  "about": { "author_name": "Silly Cam Filters", "description": "The picture pumps in and splits into red and blue edges on every beat of your voice or music. No audio source = no effect." },
+  "parameters": [
+    { "name": "audio_level", "label": "Audio Source", "type": "audiolevel" },
+    { "name": "sensitivity", "label": "Sensitivity", "type": "float", "slider": true, "min": 0.0, "max": 1.0, "step": 0.01, "default": 0.5 },
+    { "name": "zoom_amount", "label": "Zoom pulse", "type": "float", "slider": true, "min": 0.0, "max": 0.3, "step": 0.005, "default": 0.08 },
+    { "name": "split_amount", "label": "Color split", "type": "float", "slider": true, "min": 0.0, "max": 0.05, "step": 0.001, "default": 0.01 }
+  ],
+  "passes": [
+    { "name": "env", "technique": "Env", "size": [1, 1], "format": "rgba32f" },
+    { "name": "out", "technique": "Draw" }
+  ]
+}
