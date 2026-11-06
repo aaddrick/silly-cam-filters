@@ -29,6 +29,12 @@ Changes:
   - `parameters/parameter_image.hpp`: absolute default paths
   - `parameters/parameter_audiolevel.hpp`: a `linear` option
   - `parameters/parameter_factory.cpp`, `parameter_datatype.hpp`: the `vector` type
+- Changed on the `feature/25-new-effects` branch (for the 25 new effects):
+  - `shader/shader.cpp`: `@include` also searches the user `engine/include/` folder and the shipped `data/engine/include/` folder, and logs each included file (0d6ecc7).
+  - `parameters/parameter_facetracking.hpp`: the face mesh pre-raster runs once per frame, not once per pass and iteration (e7cf02f).
+  - `parameters/parameter_facetracking.hpp`: fixed the "no face" bounding box (a missing comma) and an out-of-bounds read of the bbox landmark list (310 entries read from a 246-entry array) (00ab331).
+  - `parameters/parameter_facetracking.hpp`: face textures are unbound when the face is lost (reset mode) or before tracking starts, because compiled effects are shared between filters and a stale binding could point at another filter's or a freed texture (a0b3e50).
+  - `parameters/parameter_image.hpp`: "Use custom file" on an image param with bundled values never loaded the chosen file (the settings key was built from the effect name, not the param's full name); fixed (4a48384). This bug is in upstream Shadertastic 1.3.0 too.
 - Each change is marked with a "Silly Cam Filters engine" comment.
 - `version.h` is a fixed file in place of the CMake-generated `version.h.in`.
 - `win_dll_overrides.cpp` is not compiled (Windows only).

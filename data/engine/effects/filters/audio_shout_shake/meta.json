@@ -1,0 +1,17 @@
+{
+  "metafileVersion": 1,
+  "label": "[Face Tracking] Shout Shake",
+  "about": { "author_name": "Silly Cam Filters", "description": "Get loud and the picture shakes, your face swells and a red vignette creeps in. Speaking gives a little, shouting gives a lot. No audio source = no effect." },
+  "parameters": [
+    { "type": "facetracking", "name": "fd", "use_preraster": true, "reset_on_face_lost": { "prompt": true, "default": true } },
+    { "name": "audio_level", "label": "Audio Source", "type": "audiolevel" },
+    { "name": "threshold", "label": "Loudness threshold (dB)", "type": "float", "slider": true, "min": -60.0, "max": -5.0, "step": 0.5, "default": -24.0 },
+    { "name": "shake_amount", "label": "Shake", "type": "float", "slider": true, "min": 0.0, "max": 0.05, "step": 0.001, "default": 0.012 },
+    { "name": "swell", "label": "Face swell", "type": "float", "slider": true, "min": 0.0, "max": 0.35, "step": 0.01, "default": 0.2 },
+    { "name": "vignette", "label": "Red vignette", "type": "float", "slider": true, "min": 0.0, "max": 1.0, "step": 0.01, "default": 0.6 }
+  ],
+  "passes": [
+    { "name": "env", "technique": "Env", "size": [1, 1], "format": "rgba32f" },
+    { "name": "out", "technique": "Draw" }
+  ]
+}

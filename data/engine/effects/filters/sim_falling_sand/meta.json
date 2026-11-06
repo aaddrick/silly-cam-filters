@@ -1,0 +1,133 @@
+{
+  "metafileVersion": 1,
+  "label": "Falling Sand",
+  "about": {
+    "author_name": "Silly Cam Filters",
+    "description": "Bright parts of the picture crumble into sand that falls and piles up at the bottom of the frame."
+  },
+  "parameters": [
+    {
+      "name": "threshold",
+      "label": "Brightness threshold",
+      "type": "float",
+      "slider": true,
+      "min": 0.0,
+      "max": 1.0,
+      "step": 0.01,
+      "default": 0.6
+    },
+    {
+      "name": "gravity_steps",
+      "label": "Gravity speed",
+      "type": "int",
+      "slider": true,
+      "min": 1,
+      "max": 6,
+      "step": 1,
+      "default": 2
+    },
+    {
+      "name": "spawn_rate",
+      "label": "New sand from the camera",
+      "type": "float",
+      "slider": true,
+      "min": 0.0,
+      "max": 0.2,
+      "step": 0.002,
+      "default": 0.004
+    },
+    {
+      "name": "initial_sand",
+      "label": "Sand at start and reset",
+      "type": "float",
+      "slider": true,
+      "min": 0.0,
+      "max": 1.0,
+      "step": 0.01,
+      "default": 0.25
+    },
+    {
+      "name": "sink_rate",
+      "label": "Sand drain at the bottom",
+      "type": "float",
+      "slider": true,
+      "min": 0.0,
+      "max": 0.2,
+      "step": 0.002,
+      "default": 0.02
+    },
+    {
+      "name": "evaporate",
+      "label": "Sand evaporates (keeps the pile low)",
+      "type": "float",
+      "slider": true,
+      "min": 0.0,
+      "max": 0.05,
+      "step": 0.0005,
+      "default": 0.004
+    },
+    {
+      "name": "restart_seconds",
+      "label": "Restart every (seconds at 30 fps, 0 = never)",
+      "type": "float",
+      "slider": true,
+      "min": 0.0,
+      "max": 60.0,
+      "step": 1.0,
+      "default": 0.0
+    },
+    {
+      "name": "reset",
+      "label": "Reset (hold on, then off)",
+      "type": "bool",
+      "default": false
+    },
+    {
+      "name": "sand_tint",
+      "label": "Sand tint",
+      "type": "color",
+      "default": "#FFFFD27F"
+    },
+    {
+      "name": "tint_amount",
+      "label": "Tint amount",
+      "type": "float",
+      "slider": true,
+      "min": 0.0,
+      "max": 1.0,
+      "step": 0.01,
+      "default": 0.5
+    },
+    {
+      "name": "sand_only",
+      "label": "Show only the sand",
+      "type": "bool",
+      "default": false
+    }
+  ],
+  "passes": [
+    {
+      "name": "meanl",
+      "technique": "Mean",
+      "size": [
+        1,
+        1
+      ],
+      "format": "rgba32f"
+    },
+    {
+      "name": "sand",
+      "technique": "Sand",
+      "size": [
+        320,
+        180
+      ],
+      "format": "rgba32f",
+      "iterations": "gravity_steps"
+    },
+    {
+      "name": "out",
+      "technique": "Draw"
+    }
+  ]
+}

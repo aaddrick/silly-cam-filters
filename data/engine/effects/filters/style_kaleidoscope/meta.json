@@ -1,0 +1,12 @@
+{
+  "metafileVersion": 1,
+  "label": "Kaleidoscope",
+  "about": { "author_name": "Silly Cam Filters", "description": "Folds the picture into a spinning flower of mirrored slices." },
+  "parameters": [
+    { "name": "segments", "label": "Slices", "type": "int", "slider": true, "min": 2, "max": 16, "step": 1, "default": 6 },
+    { "name": "spin_speed", "label": "Spin speed (degrees per second)", "type": "float", "slider": true, "min": -180.0, "max": 180.0, "step": 1.0, "default": 20.0 },
+    { "name": "zoom", "label": "Zoom", "type": "float", "slider": true, "min": 0.3, "max": 3.0, "step": 0.01, "default": 1.0 },
+    { "name": "center_x", "label": "Center left/right", "type": "float", "slider": true, "min": -0.5, "max": 0.5, "step": 0.01, "default": 0.0 },
+    { "name": "center_y", "label": "Center up/down", "type": "float", "slider": true, "min": -0.5, "max": 0.5, "step": 0.01, "default": 0.0 }
+  ]
+}

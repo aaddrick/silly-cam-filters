@@ -1,0 +1,115 @@
+{
+ "metafileVersion": 1,
+ "label": "Pixel Sort",
+ "about": {
+  "author_name": "Silly Cam Filters",
+  "description": "Bright and dark pixels melt into sorted streaks. More steps, longer streaks."
+ },
+ "parameters": [
+  {
+   "name": "lum_low",
+   "label": "Darkest pixel to sort",
+   "type": "float",
+   "slider": true,
+   "min": 0.0,
+   "max": 1.0,
+   "step": 0.01,
+   "default": 0.0
+  },
+  {
+   "name": "lum_high",
+   "label": "Brightest pixel to sort",
+   "type": "float",
+   "slider": true,
+   "min": 0.0,
+   "max": 1.0,
+   "step": 0.01,
+   "default": 1.0
+  },
+  {
+   "name": "sort_steps",
+   "label": "Streak length",
+   "type": "int",
+   "slider": true,
+   "min": 2,
+   "max": 384,
+   "step": 1,
+   "default": 384
+  },
+  {
+   "name": "direction",
+   "label": "Direction",
+   "type": "list_int",
+   "values": [
+    {
+     "label": "Sideways",
+     "value": 0
+    },
+    {
+     "label": "Up and down",
+     "value": 1
+    }
+   ],
+   "default": 0
+  },
+  {
+   "name": "reverse",
+   "label": "Bright first",
+   "type": "bool",
+   "default": false
+  },
+  {
+   "name": "protect_skin",
+   "label": "Keep skin tones intact",
+   "type": "bool",
+   "default": true
+  }
+ ],
+ "passes": [
+  {
+   "name": "start",
+   "technique": "Start",
+   "scale": 0.5
+  },
+  {
+   "name": "sort0",
+   "technique": "Sort0",
+   "scale": 0.5,
+   "iterations": 64
+  },
+  {
+   "name": "sort1",
+   "technique": "Sort1",
+   "scale": 0.5,
+   "iterations": 64
+  },
+  {
+   "name": "sort2",
+   "technique": "Sort2",
+   "scale": 0.5,
+   "iterations": 64
+  },
+  {
+   "name": "sort3",
+   "technique": "Sort3",
+   "scale": 0.5,
+   "iterations": 64
+  },
+  {
+   "name": "sort4",
+   "technique": "Sort4",
+   "scale": 0.5,
+   "iterations": 64
+  },
+  {
+   "name": "sort5",
+   "technique": "Sort5",
+   "scale": 0.5,
+   "iterations": 64
+  },
+  {
+   "name": "result",
+   "technique": "Out"
+  }
+ ]
+}

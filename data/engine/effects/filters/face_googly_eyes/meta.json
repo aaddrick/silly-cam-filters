@@ -1,0 +1,21 @@
+{
+  "metafileVersion": 1,
+  "label": "[Face Tracking] Googly Eyes",
+  "about": { "author_name": "Silly Cam Filters", "author_url": "" },
+  "parameters": [
+    { "type": "facetracking", "name": "fd", "use_preraster": true,
+      "reset_on_face_lost": { "prompt": true, "default": true } },
+    { "name": "eye_size", "label": "Eye size", "type": "float", "slider": true,
+      "min": 1.0, "max": 2.2, "default": 1.6, "step": 0.05,
+      "description": "Googly eye radius, as a multiple of the eye's half width." },
+    { "name": "pupil_size", "label": "Pupil size", "type": "float", "slider": true,
+      "min": 0.3, "max": 0.7, "default": 0.5, "step": 0.01 },
+    { "name": "wobble", "label": "Wobble", "type": "float", "slider": true,
+      "min": 0.0, "max": 3.0, "default": 1.0, "step": 0.05,
+      "description": "How hard the pupils swing when your head moves." }
+  ],
+  "passes": [
+    { "name": "track", "technique": "Track", "size": [4, 1], "format": "rgba32f" },
+    { "name": "out", "technique": "Draw" }
+  ]
+}

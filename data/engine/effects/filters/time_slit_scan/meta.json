@@ -1,0 +1,15 @@
+{
+  "metafileVersion": 1,
+  "label": "Slit-Scan Time Warp",
+  "about": { "author_name": "Silly Cam Filters", "description": "Different parts of the picture show different moments in time, so movement bends and ripples. The top is live; further down (or across, or out from the centre) is the past." },
+  "parameters": [
+    { "name": "direction", "label": "Direction", "type": "list_int", "default": 0,
+      "values": [ { "value": 0, "label": "Rows (top = now)" }, { "value": 1, "label": "Columns (left = now)" }, { "value": 2, "label": "Radial (centre = now)" } ] },
+    { "name": "max_delay", "label": "Max delay (frames)", "type": "float", "slider": true, "min": 1.0, "max": 15.0, "step": 0.5, "default": 10.0 },
+    { "name": "flip", "label": "Reverse (far = now)", "type": "bool", "default": false }
+  ],
+  "passes": [
+    { "name": "ring", "technique": "Ring", "scale": 1.0 },
+    { "name": "out", "technique": "Draw" }
+  ]
+}

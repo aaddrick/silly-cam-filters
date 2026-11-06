@@ -61,8 +61,18 @@ class effect_parameter_facetracking : public effect_parameter_facetracking_detai
         uint32_t cx{0};
         uint32_t cy{0};
 
+        // Silly Cam Filters engine: preraster cache (see try_gs_set_val)
+        static inline uint64_t preraster_global_generation{0};
+        gs_texture_t *preraster_cache{};
+        uint64_t preraster_generation{0};
+        uint64_t preraster_frame_time{0};
+        uint32_t preraster_cx{0};
+        uint32_t preraster_cy{0};
+
+        // Silly Cam Filters engine: a comma was missing here, so the "no face"
+        // box was (-1,-2),(-1,0) instead of (-1,-1),(-1,-1).
         static constexpr face_tracking_bounding_box no_bounding_box{
-            -1.0f, -1.0f
+            -1.0f, -1.0f,
             -1.0f, -1.0f
         };
 
@@ -144,6 +154,10 @@ class effect_parameter_facetracking : public effect_parameter_facetracking_detai
 
         void try_gs_set_val() override {
             if (!face_tracking) {
+                // Silly Cam Filters engine: no stale texture from another filter (see below).
+                try_gs_effect_set_bool("face_found", param_fd_face_found, false);
+                try_gs_effect_set_texture("points_tex", param_fd_points_tex, nullptr);
+                try_gs_effect_set_texture("preraster_tex", param_fd_preraster_tex, nullptr);
                 return;
             }
 
@@ -156,11 +170,18 @@ class effect_parameter_facetracking : public effect_parameter_facetracking_detai
                 try_gs_effect_set_bool(face_found.c_str(), param_fd_face_found, false);
                 try_gs_effect_set_vec2(bbox_tl.c_str(), param_fd_face_tl, &no_bounding_box.point1);
                 try_gs_effect_set_vec2(bbox_br.c_str(), param_fd_face_br, &no_bounding_box.point2);
+                // Silly Cam Filters engine: compiled effects are shared by every filter that uses
+                // them, so a texture left bound here could belong to another filter, or be freed
+                // already (glBindTexture GL_INVALID_OPERATION). Unbind; shaders then read zeros.
+                try_gs_effect_set_texture(points_tex.c_str(), param_fd_points_tex, nullptr);
+                try_gs_effect_set_texture(points_tex.c_str(), param_fd_preraster_tex, nullptr);
             }
             else {
                 try_gs_effect_set_bool(face_found.c_str(), param_fd_face_found, true);
                 {
-                    auto bbox = face_tracking_get_bounding_box(&face_tracking->average_results, not_lips_eyes_indices, 310);
+                    // Silly Cam Filters engine: the list has 246 entries, not 310 (out-of-bounds read).
+                    auto bbox = face_tracking_get_bounding_box(&face_tracking->average_results, not_lips_eyes_indices,
+                                                               (int)(sizeof(not_lips_eyes_indices) / sizeof(not_lips_eyes_indices[0])));
                     try_gs_effect_set_vec2(bbox_tl.c_str(), param_fd_face_tl, &bbox.point1);
                     try_gs_effect_set_vec2(bbox_br.c_str(), param_fd_face_br, &bbox.point2);
                     //debug("Face: %f %f %f %f", bbox.x1, bbox.y1, bbox.x2-bbox.x1, bbox.y2-bbox.y1);
@@ -169,7 +190,19 @@ class effect_parameter_facetracking : public effect_parameter_facetracking_detai
 
                 //Pre-raster texture
                 if (use_preraster) {
-                    auto *fd_preraster_texture = FaceTrackingRaster::mesh_uv_gpu(face_tracking->average_results.refined_landmarks, onnxmediapipe::face_triangles, (int)cx, (int)cy);
+                    // Silly Cam Filters engine: this runs once per pass and per iteration, so
+                    // rasterise the face mesh once per frame. The raster target is shared by all
+                    // filters, so the cache is valid only while nobody rasterised since.
+                    const uint64_t frame_time = obs_get_video_frame_time();
+                    if (preraster_cache == nullptr || preraster_frame_time != frame_time || preraster_cx != cx ||
+                        preraster_cy != cy || preraster_generation != preraster_global_generation) {
+                        preraster_cache = FaceTrackingRaster::mesh_uv_gpu(face_tracking->average_results.refined_landmarks, onnxmediapipe::face_triangles, (int)cx, (int)cy);
+                        preraster_generation = ++preraster_global_generation;
+                        preraster_frame_time = frame_time;
+                        preraster_cx = cx;
+                        preraster_cy = cy;
+                    }
+                    auto *fd_preraster_texture = preraster_cache;
                     try_gs_effect_set_texture(points_tex.c_str(), param_fd_preraster_tex, fd_preraster_texture);
                 }
             }
