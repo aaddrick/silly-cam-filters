@@ -9,7 +9,7 @@
     { "name": "strength", "label": "Trail strength", "type": "float", "slider": true, "min": 0.0, "max": 1.0, "step": 0.01, "default": 0.85 }
   ],
   "passes": [
-    { "name": "trail", "technique": "Trail", "format": "rgba16f" },
+    { "name": "stamp", "technique": "Stamp", "format": "rgba16f" },
     { "name": "out", "technique": "Draw" }
   ]
 }
