@@ -68,13 +68,13 @@
       "min": 0.0,
       "max": 1.0,
       "step": 0.01,
-      "default": 0.35
+      "default": 0.2
     },
     {
       "name": "pattern_color",
       "label": "Pattern color",
       "type": "color",
-      "default": "#FFFF8C3A"
+      "default": "#FF3AC8B4"
     },
     {
       "name": "restart_seconds",
