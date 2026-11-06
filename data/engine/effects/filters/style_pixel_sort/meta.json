@@ -14,7 +14,7 @@
    "min": 0.0,
    "max": 1.0,
    "step": 0.01,
-   "default": 0.05
+   "default": 0.0
   },
   {
    "name": "lum_high",
@@ -24,7 +24,7 @@
    "min": 0.0,
    "max": 1.0,
    "step": 0.01,
-   "default": 0.85
+   "default": 1.0
   },
   {
    "name": "sort_steps",
@@ -34,7 +34,7 @@
    "min": 2,
    "max": 384,
    "step": 1,
-   "default": 192
+   "default": 384
   },
   {
    "name": "direction",
