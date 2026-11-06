@@ -1,6 +1,6 @@
 # Silly Cam Filters
 
-An OBS Studio plugin with one filter, **Silly Effect**, that runs every effect: 158 shader effects, 56 folder effects (multi-pass, face tracking, audio), and a place to write your own. TODO(Director): shaders recount: `data/engine/shaders/` holds 163 `.shader`/`.effect` files, but the old text said 158; I kept 158 and the total is 158 + 56 = 214.
+An OBS Studio plugin with one filter, **Silly Effect**, that runs every effect: 158 shader effects, 56 folder effects (multi-pass, face tracking, audio), and a place to write your own.
 
 I built it for "Silly Cam", a scene collection of goofy webcam effects for video calls: one scene per effect, each with its own settings. Before this plugin, the effects came from three separate plugins with three different effect formats. Now one engine runs them all.
 
@@ -60,7 +60,7 @@ These effects were written for this plugin. They are effect folders in `data/eng
 | Shout Shake | Above a loudness threshold: shake, face swell and a red vignette. | yes | yes |
 | Voice Waveform Ring | A ring around your face that spikes with your voice. | yes | yes |
 | Falling Sand | Bright pixels fall and pile up. | | |
-| Fluid Smoke | Motion stirs a smoke that follows your hands. | | |
+| Fluid Smoke | Movement stirs up swirling colored smoke. | | |
 | Game of Life | Conway's Game of Life seeded from the camera. | | |
 | Reaction-Diffusion Skin | A Gray-Scott pattern that grows from the camera's edges. | | |
 | Kaleidoscope | Folds the image into a rotating mirror pattern. | | |
@@ -69,18 +69,16 @@ These effects were written for this plugin. They are effect folders in `data/eng
 | Pixel Sort | Streaks pixels by brightness. | | |
 | Datamosh | Smears the previous picture along the motion. | | |
 | Delay Grid | A 3x3 grid; each cell shows the picture a little further back. | | |
-| Echo Trails | Moving parts leave fading, color-shifting trails. | | |
+| Echo Trails | Moving things leave bright, rainbow-colored trails. | | |
 | Freeze Frame Stutter | Random tiles freeze on loud sounds. | | yes |
 | Slit-Scan Time Warp | Rows of the picture come from different moments. | | |
 
-TODO(Director): the one-line descriptions come from the plan and the slice notes, not from re-reading each effect. Check Fluid Smoke ("Hands"), Echo Trails and Delay Grid wording against what shipped. Labels and the face/audio columns come from each `meta.json`.
 
 ### Known limits
 
 - **Face Swap with Source** is provisional. It maps another source as a face texture in the canonical face layout, and it does not track a second face.
 - **Kuwahara Oil Paint** is mild at the defaults. Raise "Brush size" for a stronger paint look.
 - **Perfect Symmetry** with side set to right leaves a dark band over the left brow. The default (left) is clean. **Eyes on Mouth** smudges the mouth area when the face is small (far from the camera).
-- **Pixel Sort** is subtle at the defaults. Lower the threshold for stronger streaks. TODO(Director): D40 says this applies only if the final tune missed its target; confirm or delete.
 - Stacked face effects each run face tracking, so use one at a time on a slow machine.
 - The first frame after you add a filter is blank (one frame). This is an engine behaviour that also affects the older effects.
 - When a face is lost, face effects pop back to the plain image. They do not fade out.
