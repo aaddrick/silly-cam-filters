@@ -47,16 +47,23 @@ float4 PSTrack(VertData v_in) : TARGET {
     return float4(lerp(prev1.rg, cur1.rg, a), p, 1.0);
 }
 
-// Bulge with a flat centre: uniform magnification 1/(1-strength) inside half the radius, then a
-// smoothstep back to identity at the rim. Monotonic (no fold) for strength < 1.
-float2 big_eye_uv(float2 uv, float2 c, float r_eye, float max_r) {
-    float radius = max(min(size * r_eye, max_r), 1e-5);
+// Eye bulge, v2 (taste fix): an ellipse aligned with the eye axis, short vertically (1.15 eye half-widths, so the brows
+// stay outside it), longer on the temple side (3.0) than on the nose side (2.1, capped by the other eye). Radial in the
+// normalized ellipse: flat magnification 1/(1-strength) inside 0.4 of it, smoothstep back to identity at its edge.
+// Monotonic (no fold) for strength < 1. At the defaults: 2.0x at the centre, ~1.8x across the eye opening, 1.7x at the
+// outer corner, 1.4x at the inner corner.
+float2 big_eye_uv(float2 uv, float2 c, float r_eye, float max_nose, float2 axis, float temple_sign) {
     float2 d = sf_to_iso(uv) - sf_to_iso(c);
-    float r = length(d) / radius;
+    float u = dot(d, axis);
+    float v = dot(d, float2(-axis.y, axis.x));
+    float hw = max(r_eye, 1e-5);
+    float rx = (u * temple_sign > 0.0) ? 3.0 * hw * size : min(2.1 * hw * size, max_nose);
+    float ry = 1.15 * hw * size;
+    float r = length(float2(u / max(rx, 1e-5), v / max(ry, 1e-5)));
     if (r >= 1.0) {
         return uv;
     }
-    float k = 1.0 - strength * (1.0 - smoothstep(0.5, 1.0, r));
+    float k = 1.0 - strength * (1.0 - smoothstep(0.4, 1.0, r));
     return sf_from_iso(sf_to_iso(c) + d * k);
 }
 
@@ -70,10 +77,12 @@ float4 PSDraw(VertData v_in) : TARGET {
     }
     float2 cl = t0.xy;
     float2 cr = t0.zw;
-    // keep the two bulges from overlapping between the eyes
-    float max_r = 0.5 * distance(sf_to_iso(cl), sf_to_iso(cr));
-    float2 uv = big_eye_uv(v_in.uv, cl, t1.r, max_r);
-    uv = big_eye_uv(uv, cr, t1.g, max_r);
+    float2 dlr = sf_to_iso(cr) - sf_to_iso(cl);
+    float half_dist = 0.5 * length(dlr);
+    float2 axis = dlr / max(2.0 * half_dist, 1e-6);
+    // inner (nose-side) reach stops short of the midpoint between the eyes, so the bulges never overlap
+    float2 uv = big_eye_uv(v_in.uv, cl, t1.r, 0.95 * half_dist, axis, -1.0);
+    uv = big_eye_uv(uv, cr, t1.g, 0.95 * half_dist, axis, 1.0);
     float s = smoothstep(0.0, 1.0, p);
     // fade the warp itself (not a cross-dissolve), so there is no ghosting
     uv = lerp(v_in.uv, uv, s);

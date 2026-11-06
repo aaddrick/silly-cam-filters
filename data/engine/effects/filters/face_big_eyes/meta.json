@@ -20,11 +20,11 @@
       "label": "Bulge size",
       "type": "float",
       "slider": true,
-      "min": 1.2,
-      "max": 2.4,
-      "default": 2.2,
-      "step": 0.05,
-      "description": "Radius of each bulge, as a multiple of the eye's half width."
+      "min": 0.6,
+      "max": 1.4,
+      "default": 1.0,
+      "step": 0.01,
+      "description": "Size of the magnified area around each eye."
     },
     {
       "name": "strength",
@@ -32,10 +32,10 @@
       "type": "float",
       "slider": true,
       "min": 0.0,
-      "max": 0.6,
-      "default": 0.4,
+      "max": 0.7,
+      "default": 0.5,
       "step": 0.01,
-      "description": "Eye magnification: 0.4 = about 1.45x at the eye corners, 1.67x at the centre."
+      "description": "Eye magnification: 0.5 = 2x at the centre, about 1.7x at the eye corners."
     }
   ],
   "passes": [
