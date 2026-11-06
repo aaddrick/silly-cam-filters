@@ -1,5 +1,9 @@
 // Reaction-Diffusion Skin: Gray-Scott on a 384x216 rgba32f grid.
-// State: r = U (food), g = V (the pattern), a = 1 once started (0 before the first frame).
+// State: r = U (food), g = V (the pattern), b = reach (1 on a seeding edge, falling 1/REACH per texel away), a = 1 once started.
+// Clock: a 1x1 rgba32f pass kept across frames (clock_prev): r = 1 on a restart frame, g = frames since restart,
+// b = `time` at restart, a = 1 + rand_seed (stamp of this filter instance; anything else = not started).
+// A restart fires when frames >= restart_seconds*30 OR wall seconds >= restart_seconds (counted, never an exact frame_index test),
+// so skipped frame numbers, slow renderers and stale textures from another filter all still restart.
 // U' = U + Du*lap(U) - U*V*V + F*(1-U);  V' = V + Dv*lap(V) + U*V*V - (F+k)*V;  Du = 1, Dv = 0.5, dt = 1.
 // Camera edges inject V; the picture's brightness shifts F a little so the pattern follows you.
 // Every value is clamped to 0..1.
@@ -16,6 +20,8 @@ uniform bool show_chemical;
 
 uniform texture2d rd;
 uniform texture2d rd_prev;
+uniform texture2d clock;
+uniform texture2d clock_prev;
 
 uniform float2 pass_size;
 uniform float2 pass_texel;
@@ -61,12 +67,37 @@ float4 PSMean(VertData v_in) : TARGET
     return float4(acc / 64.0, 0.0, 0.0, 1.0);
 }
 
+// Restart clock (see header). One texel; every rd texel reads the same decision.
+float4 PSClock(VertData v_in) : TARGET
+{
+    float4 c = clock_prev.Sample(pointSampler, float2(0.5, 0.5) + v_in.uv * 0.0);
+    bool started = c.a > 0.5 && abs(c.a - 1.0 - rand_seed) < 0.0001;
+    float frames = c.g + 1.0;
+    float secs = time - c.b;
+    bool restart = !started || reset;
+    if (restart_seconds > 0.5)
+        restart = restart || frames >= restart_seconds * 30.0 || secs >= restart_seconds || secs < -0.5;
+    if (restart)
+        return float4(1.0, 0.0, time, 1.0 + rand_seed);
+    return float4(0.0, frames, c.b, c.a);
+}
+
+// Fraction of the restart period that has passed (by frames or by wall time, whichever is further).
+float period_phase()
+{
+    float4 c = clock.Sample(pointSampler, float2(0.5, 0.5));
+    if (restart_seconds <= 0.5) return 0.5;
+    return saturate(max(c.g / (restart_seconds * 30.0), (time - c.b) / restart_seconds));
+}
+
 // Luma relative to the frame mean: the mean maps to 0.5, so one threshold works on dim and bright footage.
 float rel_luma(float3 rgb)
 {
     float m = meanl.Sample(pointSampler, float2(0.5, 0.5)).r;
     return saturate(0.5 + (dot(rgb, float3(0.299, 0.587, 0.114)) - m) * 1.5);
 }
+
+#define REACH 11.0
 
 float luma_at(float2 uv)
 {
@@ -87,9 +118,7 @@ float4 PSStep(VertData v_in) : TARGET
     float2 tx = pass_texel;
     float4 s = rd_at(uv);
 
-    bool restart = false;
-    if (restart_seconds > 0.5)
-        restart = frame_index > 0 && (frame_index % int(restart_seconds * 30.0)) == 0;
+    bool restart = clock.Sample(pointSampler, float2(0.5, 0.5)).r > 0.5;
 
     float lum = rel_luma(image.Sample(textureSampler, uv).rgb);
 
@@ -106,6 +135,7 @@ float4 PSStep(VertData v_in) : TARGET
     float4 nw = rd_at(uv + float2(-tx.x, -tx.y));
     float4 se = rd_at(uv + float2( tx.x,  tx.y));
     float4 sw = rd_at(uv + float2(-tx.x,  tx.y));
+    float reach_n = max(max(n.b, so.b), max(e.b, w.b));
     float2 lap = 0.2 * (n.rg + so.rg + e.rg + w.rg) + 0.05 * (ne.rg + nw.rg + se.rg + sw.rg) - s.rg;
 
     float F = 0.0545;
@@ -129,13 +159,22 @@ float4 PSStep(VertData v_in) : TARGET
             edge = max(edge, sqrt(l1 * l1 + l2 * l2));
         }
         float seed = saturate(edge * 4.0 - 0.3) * seed_edges;
-        V = max(V, seed);
+        // Plant drops on about a third of the edge texels (fixed per texel), not a solid band, so moving edges
+        // leave coral sprouts instead of smearing flat stripes.
+        float2 cell = floor(uv * pass_size);
+        float drop = frac(sin(dot(cell, float2(12.9898, 78.233))) * 43758.5453);
+        V = max(V, seed * step(drop, 0.35));
+        reach_n = max(reach_n, saturate(seed * 8.0) + 1.0 / REACH);
     }
+    // Leash: the pattern only lives within REACH texels of an edge seen recently, so it borders the picture's
+    // edges instead of flooding the frame (and trails behind moving things die within a few frames).
+    float reach = saturate(reach_n - 1.0 / REACH);
+    V *= lerp(0.75, 1.0, smoothstep(0.0, 0.35, reach));
     // The pattern dies off on the brighter parts of the picture (skin, white shirts), so faces stay clear.
     V *= 1.0 - follow * 0.12 * smoothstep(0.45, 0.65, lum);
     U = clamp(U, 0.0, 1.0);
     V = clamp(V, 0.0, 1.0);
-    return float4(U, V, 0.0, 1.0);
+    return float4(U, V, reach, 1.0);
 }
 
 float4 PSDraw(VertData v_in) : TARGET
@@ -152,9 +191,8 @@ float4 PSDraw(VertData v_in) : TARGET
     // Fade in after a restart and out before the next one.
     float vis = 1.0;
     if (restart_seconds > 0.5) {
-        float period = restart_seconds * 30.0;
-        float ph = fmod(float(frame_index), period);
-        vis = saturate(min(ph / 45.0, (period - ph) / 45.0));
+        float ph = period_phase();
+        vis = saturate(min(ph, 1.0 - ph) * restart_seconds / 1.5);
     }
     float3 rgb = lerp(base.rgb, shown, mix_amount * vis);
     if (show_chemical)
@@ -164,4 +202,5 @@ float4 PSDraw(VertData v_in) : TARGET
 
 technique Step { pass { vertex_shader = VSDefault(v_in); pixel_shader = PSStep(v_in); } }
 technique Draw { pass { vertex_shader = VSDefault(v_in); pixel_shader = PSDraw(v_in); } }
+technique Clock { pass { vertex_shader = VSDefault(v_in); pixel_shader = PSClock(v_in); } }
 technique Mean { pass { vertex_shader = VSDefault(v_in); pixel_shader = PSMean(v_in); } }

@@ -78,7 +78,7 @@
     },
     {
       "name": "restart_seconds",
-      "label": "Restart every (seconds at 30 fps, 0 = never)",
+      "label": "Restart every (seconds, 0 = never)",
       "type": "float",
       "slider": true,
       "min": 0.0,
@@ -103,6 +103,15 @@
     {
       "name": "meanl",
       "technique": "Mean",
+      "size": [
+        1,
+        1
+      ],
+      "format": "rgba32f"
+    },
+    {
+      "name": "clock",
+      "technique": "Clock",
       "size": [
         1,
         1
