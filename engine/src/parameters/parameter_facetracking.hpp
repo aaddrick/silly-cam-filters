@@ -61,8 +61,10 @@ class effect_parameter_facetracking : public effect_parameter_facetracking_detai
         uint32_t cx{0};
         uint32_t cy{0};
 
+        // Silly Cam Filters engine: a comma was missing here, so the "no face"
+        // box was (-1,-2),(-1,0) instead of (-1,-1),(-1,-1).
         static constexpr face_tracking_bounding_box no_bounding_box{
-            -1.0f, -1.0f
+            -1.0f, -1.0f,
             -1.0f, -1.0f
         };
 
@@ -160,7 +162,9 @@ class effect_parameter_facetracking : public effect_parameter_facetracking_detai
             else {
                 try_gs_effect_set_bool(face_found.c_str(), param_fd_face_found, true);
                 {
-                    auto bbox = face_tracking_get_bounding_box(&face_tracking->average_results, not_lips_eyes_indices, 310);
+                    // Silly Cam Filters engine: the list has 246 entries, not 310 (out-of-bounds read).
+                    auto bbox = face_tracking_get_bounding_box(&face_tracking->average_results, not_lips_eyes_indices,
+                                                               (int)(sizeof(not_lips_eyes_indices) / sizeof(not_lips_eyes_indices[0])));
                     try_gs_effect_set_vec2(bbox_tl.c_str(), param_fd_face_tl, &bbox.point1);
                     try_gs_effect_set_vec2(bbox_br.c_str(), param_fd_face_br, &bbox.point2);
                     //debug("Face: %f %f %f %f", bbox.x1, bbox.y1, bbox.x2-bbox.x1, bbox.y2-bbox.y1);
