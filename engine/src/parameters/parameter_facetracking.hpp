@@ -146,6 +146,10 @@ class effect_parameter_facetracking : public effect_parameter_facetracking_detai
 
         void try_gs_set_val() override {
             if (!face_tracking) {
+                // Silly Cam Filters engine: no stale texture from another filter (see below).
+                try_gs_effect_set_bool("face_found", param_fd_face_found, false);
+                try_gs_effect_set_texture("points_tex", param_fd_points_tex, nullptr);
+                try_gs_effect_set_texture("preraster_tex", param_fd_preraster_tex, nullptr);
                 return;
             }
 
@@ -158,6 +162,11 @@ class effect_parameter_facetracking : public effect_parameter_facetracking_detai
                 try_gs_effect_set_bool(face_found.c_str(), param_fd_face_found, false);
                 try_gs_effect_set_vec2(bbox_tl.c_str(), param_fd_face_tl, &no_bounding_box.point1);
                 try_gs_effect_set_vec2(bbox_br.c_str(), param_fd_face_br, &no_bounding_box.point2);
+                // Silly Cam Filters engine: compiled effects are shared by every filter that uses
+                // them, so a texture left bound here could belong to another filter, or be freed
+                // already (glBindTexture GL_INVALID_OPERATION). Unbind; shaders then read zeros.
+                try_gs_effect_set_texture(points_tex.c_str(), param_fd_points_tex, nullptr);
+                try_gs_effect_set_texture(points_tex.c_str(), param_fd_preraster_tex, nullptr);
             }
             else {
                 try_gs_effect_set_bool(face_found.c_str(), param_fd_face_found, true);
