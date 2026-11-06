@@ -1,0 +1,43 @@
+{
+  "metafileVersion": 1,
+  "label": "[Face Tracking] Face Swap with Source",
+  "about": {
+    "author_name": "Silly Cam Filters",
+    "author_url": "",
+    "description": "Wears another OBS source as a face: a front-facing face photo becomes a mask that follows your head, or any picture becomes face paint. Your own eyes and mouth can show through. Line the photo up with the alignment sliders."
+  },
+  "parameters": [
+    {
+      "type": "facetracking",
+      "name": "fd",
+      "use_preraster": true,
+      "reset_on_face_lost": { "prompt": true, "default": true }
+    },
+    { "name": "face_src", "label": "Face source (photo or image)", "type": "source" },
+    { "name": "strength", "label": "Strength", "type": "float", "slider": true, "min": 0.0, "max": 1.0, "step": 0.01, "default": 1.0 },
+    { "name": "own_features", "label": "Show my eyes and mouth", "type": "bool", "default": true },
+    {
+      "name": "edge", "label": "Edge softness", "type": "float", "slider": true, "min": 0.0, "max": 0.4, "step": 0.01, "default": 0.15,
+      "description": "Fades the borrowed face out towards the edge of your face."
+    },
+    {
+      "name": "shading", "label": "Keep my lighting", "type": "float", "slider": true, "min": 0.0, "max": 1.0, "step": 0.01, "default": 0.35,
+      "description": "Carries your face's light and shadow onto the borrowed face."
+    },
+    {
+      "name": "align_group", "label": "Line up the photo", "type": "group",
+      "parameters": [
+        { "name": "src_cx", "label": "Face centre (left-right)", "type": "float", "slider": true, "min": 0.0, "max": 1.0, "step": 0.005, "default": 0.5 },
+        { "name": "src_eyes_y", "label": "Eye line height", "type": "float", "slider": true, "min": 0.0, "max": 1.0, "step": 0.005, "default": 0.40 },
+        { "name": "src_eye_dist", "label": "Eye distance", "type": "float", "slider": true, "min": 0.02, "max": 0.8, "step": 0.005, "default": 0.30,
+          "description": "Distance between the eye centres, as a share of the source width." },
+        { "name": "src_mouth_y", "label": "Mouth height", "type": "float", "slider": true, "min": 0.0, "max": 1.0, "step": 0.005, "default": 0.72 }
+      ]
+    }
+  ],
+  "passes": [
+    { "name": "presence", "technique": "Presence", "size": [1, 1], "format": "rgba16f" },
+    { "name": "shade", "technique": "Shade", "scale": 0.125 },
+    { "name": "out", "technique": "Draw" }
+  ]
+}
