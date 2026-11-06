@@ -24,7 +24,7 @@
    "min": 0.0,
    "max": 1.0,
    "step": 0.01,
-   "default": 0.7
+   "default": 0.85
   },
   {
    "name": "sort_steps",
@@ -57,6 +57,12 @@
    "label": "Bright first",
    "type": "bool",
    "default": false
+  },
+  {
+   "name": "protect_skin",
+   "label": "Keep skin tones intact",
+   "type": "bool",
+   "default": true
   }
  ],
  "passes": [

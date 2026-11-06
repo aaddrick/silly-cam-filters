@@ -10,6 +10,7 @@ uniform float lum_high;
 uniform int sort_steps;
 uniform int direction;
 uniform bool reverse;
+uniform bool protect_skin;
 
 uniform texture2d start;
 uniform texture2d sort0;
@@ -72,6 +73,10 @@ float4 PSStart(VertData v_in) : TARGET
     float lo = mn + lum_low * rng;
     float hi = mn + lum_high * rng;
     float m = (l >= lo && l <= hi) ? 1.0 : 0.0;
+    // skin-like colours (warm, r > g > b, not saturated orange) are never sorted, so faces stay readable
+    float3 q = c.rgb;
+    bool skin = (q.r > q.b + 0.02) && (q.r >= q.g) && (q.g >= q.b * 0.9) && ((q.r - q.g) < 0.3) && (q.r > 0.05);
+    if (protect_skin && skin) m = 0.0;
     return float4(c.rgb, m);
 }
 
